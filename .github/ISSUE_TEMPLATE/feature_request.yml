@@ -1,0 +1,43 @@
+name: Feature Request — New Diagnostic Section
+description: Suggest a performance area not yet covered by pgvitals
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Suggest a new diagnostic query or section. The best requests include a real scenario where the missing query would have helped.
+
+  - type: input
+    id: area
+    attributes:
+      label: Performance area
+      description: e.g. "Partitioned table stats", "pg_cron job delays", "Logical replication conflict tracking"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this catch?
+      description: Describe the symptom, bottleneck, or failure mode this query would surface.
+    validations:
+      required: true
+
+  - type: textarea
+    id: threshold
+    attributes:
+      label: What threshold indicates a problem?
+      description: What value in the query output should trigger action?
+
+  - type: textarea
+    id: query
+    attributes:
+      label: Draft query (optional)
+      description: Paste a working query if you have one. It will be reviewed and refined.
+      render: sql
+
+  - type: input
+    id: pg_version
+    attributes:
+      label: Minimum PostgreSQL version
+      placeholder: "14"

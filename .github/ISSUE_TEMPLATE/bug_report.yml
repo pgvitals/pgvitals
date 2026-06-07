@@ -1,0 +1,53 @@
+name: Bug Report
+description: A query returns wrong results, crashes, or has a compatibility issue
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill in as much detail as possible.
+
+  - type: input
+    id: section
+    attributes:
+      label: Section number and file
+      description: e.g. "11 · table_bloat.sql"
+      placeholder: "NN · filename.sql"
+    validations:
+      required: true
+
+  - type: input
+    id: pg_version
+    attributes:
+      label: PostgreSQL version
+      description: Output of `SELECT version();`
+      placeholder: "PostgreSQL 15.3 on x86_64-pc-linux-gnu ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What went wrong
+      description: Describe the incorrect behaviour — wrong results, error message, crash, etc.
+    validations:
+      required: true
+
+  - type: textarea
+    id: error
+    attributes:
+      label: Error output (if any)
+      render: shell
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Cloud provider, RDS/Aurora, extensions installed, etc.

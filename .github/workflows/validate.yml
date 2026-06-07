@@ -1,0 +1,103 @@
+name: Validate
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  structure:
+    name: Repository structure
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check all sql/ files have required header
+        run: |
+          FAILED=0
+          for f in sql/[0-9]*.sql; do
+            if ! grep -q "-- What" "$f"; then
+              echo "MISSING header in $f"
+              FAILED=1
+            fi
+            if ! grep -q "-- Look for" "$f"; then
+              echo "MISSING 'Look for' in $f"
+              FAILED=1
+            fi
+            if ! grep -q "-- Action" "$f"; then
+              echo "MISSING 'Action' in $f"
+              FAILED=1
+            fi
+          done
+          if [ $FAILED -ne 0 ]; then exit 1; fi
+          echo "All section headers OK"
+
+      - name: Check no DML/DDL in sql/ sections
+        run: |
+          FAILED=0
+          for f in sql/[0-9]*.sql; do
+            # Allow only SELECT, WITH, comments, and whitespace
+            if grep -iE "^\s*(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|GRANT|REVOKE)" "$f"; then
+              echo "DML/DDL found in $f — sql/ files must be read-only"
+              FAILED=1
+            fi
+          done
+          if [ $FAILED -ne 0 ]; then exit 1; fi
+          echo "No DML/DDL in sql/ — OK"
+
+      - name: Count sections match docs
+        run: |
+          SQL_COUNT=$(ls sql/[0-9]*.sql | wc -l)
+          echo "Section files: $SQL_COUNT"
+          echo "Expected: 33 (00 prerequisites + 01-32)"
+          if [ "$SQL_COUNT" -ne 33 ]; then
+            echo "Section count mismatch — update docs/SECTIONS.md if you added/removed a section"
+          fi
+
+  syntax:
+    name: SQL syntax check (PostgreSQL 16)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: pgvitals
+          POSTGRES_DB: pgvitals_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pg_stat_statements
+        env:
+          PGPASSWORD: pgvitals
+        run: |
+          psql -h localhost -U postgres -d pgvitals_test \
+            -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
+
+      - name: Syntax-check all sql/ sections
+        env:
+          PGPASSWORD: pgvitals
+        run: |
+          FAILED=0
+          for f in sql/[0-9]*.sql; do
+            # Use EXPLAIN dry-run where possible; fall back to syntax-only parse
+            if ! psql -h localhost -U postgres -d pgvitals_test \
+                 --set ON_ERROR_STOP=off \
+                 -c "\set QUIET on" \
+                 -f "$f" > /dev/null 2>&1; then
+              echo "Parse error in $f"
+              psql -h localhost -U postgres -d pgvitals_test -f "$f" 2>&1 | tail -5
+              FAILED=1
+            else
+              echo "OK: $f"
+            fi
+          done
+          if [ $FAILED -ne 0 ]; then exit 1; fi

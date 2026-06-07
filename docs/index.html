@@ -271,18 +271,8 @@
     .section-card:hover { border-color: var(--border2); }
 
     .card-header {
-      padding: 16px 20px;
-      cursor: pointer;
-      user-select: none;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      transition: background 0.12s;
+      padding: 16px 20px 14px;
     }
-
-    .card-header:hover { background: var(--surface2); }
-
-    .card-header-text { flex: 1; min-width: 0; }
 
     .card-meta {
       display: flex;
@@ -291,17 +281,15 @@
       margin-bottom: 6px;
     }
 
-    /* ── Collapsible body ───────────────────────────────── */
-    .card-body {
+    /* ── Collapsible SQL ────────────────────────────────── */
+    .sql-content {
       overflow: hidden;
       max-height: 0;
-      transition: max-height 0.32s ease;
-      border-top: 0px solid var(--border);
+      transition: max-height 0.3s ease;
     }
 
-    .section-card.open .card-body {
-      max-height: 1600px;
-      border-top-width: 1px;
+    .sql-wrap.open .sql-content {
+      max-height: 1200px;
     }
 
     /* ── Chevron ────────────────────────────────────────── */
@@ -311,8 +299,16 @@
       transition: transform 0.25s ease, color 0.15s;
     }
 
-    .card-header:hover .chevron { color: var(--text2); }
-    .section-card.open .chevron { transform: rotate(180deg); color: var(--blue); }
+    .sql-toolbar:hover .chevron { color: var(--text2); }
+    .sql-wrap.open .chevron { transform: rotate(180deg); color: var(--blue); }
+
+    /* ── SQL toolbar — clickable to toggle ─────────────── */
+    .sql-toolbar {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .sql-toolbar:hover { background: #1a2030; }
 
     /* ── Expand all button ──────────────────────────────── */
     .btn-expand-all {
@@ -594,16 +590,16 @@
   let activeArea = 'all';
   let searchQuery = '';
 
-  // ── Expand / collapse all ──────────────────────────────
+  // ── Expand / collapse all SQL ──────────────────────────
   let allExpanded = false;
 
   function toggleAll() {
     allExpanded = !allExpanded;
-    document.querySelectorAll('.section-card').forEach(card => {
-      card.classList.toggle('open', allExpanded);
+    document.querySelectorAll('.sql-wrap').forEach(w => {
+      w.classList.toggle('open', allExpanded);
     });
     document.getElementById('btn-expand-all').textContent =
-      allExpanded ? '⊖ Collapse all' : '⊕ Expand all';
+      allExpanded ? '⊖ Collapse SQL' : '⊕ Expand SQL';
   }
 
   // ── Filters ────────────────────────────────────────────
@@ -637,16 +633,16 @@
     wrap.appendChild(expandBtn);
   }
 
-  // ── Toggle individual card ──────────────────────────────
-  function toggleCard(header) {
-    header.closest('.section-card').classList.toggle('open');
+  // ── Toggle SQL on a single card ────────────────────────
+  function toggleSQL(toolbar) {
+    toolbar.closest('.sql-wrap').classList.toggle('open');
   }
 
   // ── Card rendering ─────────────────────────────────────
   function renderCard(section) {
     const area = AREAS.find(a => a.slug === section.areaSlug);
     const card = document.createElement('div');
-    card.className = 'section-card' + (allExpanded ? ' open' : '');
+    card.className = 'section-card';
     card.dataset.area = section.areaSlug;
 
     const requiresHtml = section.requires
@@ -656,40 +652,40 @@
     const chevronSvg = `<svg class="chevron" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z"/></svg>`;
 
     card.innerHTML = `
-      <div class="card-header" onclick="toggleCard(this)">
-        <div class="card-header-text">
-          <div class="card-meta">
-            <span class="area-badge area-${section.areaSlug}">${area?.label || section.areaSlug}</span>
-            <span class="section-num">#${section.id}</span>
-          </div>
-          <div class="card-title">${section.title}</div>
+      <div class="card-header">
+        <div class="card-meta">
+          <span class="area-badge area-${section.areaSlug}">${area?.label || section.areaSlug}</span>
+          <span class="section-num">#${section.id}</span>
         </div>
-        ${chevronSvg}
+        <div class="card-title">${section.title}</div>
       </div>
-      <div class="card-body">
-        <div class="card-info">
-          <div class="info-row">
-            <span class="info-label">What</span>
-            <span class="info-value">${section.what}</span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">Look for</span>
-            <span class="info-value">${section.lookFor}</span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">Action</span>
-            <span class="info-value">${section.action}</span>
-          </div>
-          ${requiresHtml}
+      <div class="card-info">
+        <div class="info-row">
+          <span class="info-label">What</span>
+          <span class="info-value">${section.what}</span>
         </div>
-        <div class="sql-wrap">
-          <div class="sql-toolbar">
-            <span class="sql-label">SQL</span>
-            <button class="copy-btn" onclick="copySQL(this)">
+        <div class="info-row">
+          <span class="info-label">Look for</span>
+          <span class="info-value">${section.lookFor}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Action</span>
+          <span class="info-value">${section.action}</span>
+        </div>
+        ${requiresHtml}
+      </div>
+      <div class="sql-wrap${allExpanded ? ' open' : ''}">
+        <div class="sql-toolbar" onclick="toggleSQL(this)">
+          <span class="sql-label">SQL</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <button class="copy-btn" onclick="event.stopPropagation();copySQL(this)">
               <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z"></path><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z"></path></svg>
               Copy
             </button>
+            ${chevronSvg}
           </div>
+        </div>
+        <div class="sql-content">
           <pre class="sql-block"><code class="language-sql">${escapeHtml(section.sql.trim())}</code></pre>
         </div>
       </div>
@@ -708,7 +704,7 @@
 
   // ── Copy button ────────────────────────────────────────
   function copySQL(btn) {
-    const code = btn.closest('.sql-wrap').querySelector('code');
+    const code = btn.closest('.sql-wrap').querySelector('.sql-content code');
     navigator.clipboard.writeText(code.innerText).then(() => {
       btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path></svg> Copied!`;
       btn.classList.add('copied');

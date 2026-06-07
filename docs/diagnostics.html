@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Diagnostics — pgvitals</title>
+  <meta name="description" content="32 PostgreSQL diagnostic SQL queries. Search, filter by area, expand and copy." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --accent:        #1d4ed8;
+      --accent-light:  #2563eb;
+      --accent-pale:   rgba(37,99,235,.12);
+      --accent-border: rgba(147,197,253,.25);
+      --accent-text:   #93c5fd;
+      --hero-bg:       #0f172a;
+      --dark-surface:  #1e293b;
+      --dark-card:     #162032;
+      --dark-sql:      #0d1929;
+      --ink:           #0f172a;
+      --ink-mid:       #334155;
+      --slate:         #64748b;
+      --slate-light:   #94a3b8;
+      --slate-lighter: #cbd5e1;
+      --border:        #e2e8f0;
+      --border-dark:   rgba(255,255,255,.07);
+      --bg:            #f8fafc;
+      --white:         #ffffff;
+      --wrap:          1200px;
+      --px:            32px;
+      --radius:        6px;
+      --radius-lg:     12px;
+
+      --col-query:       #3b82f6;
+      --col-index:       #22c55e;
+      --col-table:       #f97316;
+      --col-vacuum:      #a855f7;
+      --col-connections: #f59e0b;
+      --col-replication: #06b6d4;
+      --col-risk:        #ef4444;
+      --col-config:      #64748b;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--hero-bg);
+      color: var(--slate-lighter);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+
+    /* ── Nav ─────────────────────────────────────────────── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      background: rgba(15,23,42,0.97);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border-dark);
+    }
+
+    .nav-inner {
+      max-width: var(--wrap);
+      margin: 0 auto;
+      padding: 0 var(--px);
+      height: 60px;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      font-weight: 800;
+      font-size: 18px;
+      color: var(--white);
+      letter-spacing: -0.4px;
+      flex-shrink: 0;
+    }
+
+    .nav-logo span { color: var(--accent-text); }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      padding: 6px 12px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--slate-light);
+      text-decoration: none;
+      border-radius: var(--radius);
+      transition: background 0.12s, color 0.12s;
+    }
+
+    .nav-links a:hover { background: rgba(255,255,255,.06); color: var(--white); }
+    .nav-links a.active { color: var(--accent-text); font-weight: 600; }
+
+    .nav-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-ghost-dark {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--slate-light);
+      border: 1px solid var(--border-dark);
+      border-radius: var(--radius);
+      text-decoration: none;
+      transition: all 0.12s;
+    }
+
+    .btn-ghost-dark:hover { border-color: rgba(255,255,255,.2); color: var(--white); }
+
+    /* ── Page header ─────────────────────────────────────── */
+    .page-header {
+      border-bottom: 1px solid var(--border-dark);
+      padding: 36px var(--px) 0;
+    }
+
+    .page-header-inner {
+      max-width: var(--wrap);
+      margin: 0 auto;
+    }
+
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--slate);
+      margin-bottom: 20px;
+    }
+
+    .breadcrumb a { color: var(--slate); text-decoration: none; }
+    .breadcrumb a:hover { color: var(--accent-text); }
+    .breadcrumb-sep { color: var(--slate); }
+
+    .page-header h1 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: clamp(1.8rem, 2.5vw, 2.4rem);
+      font-weight: 800;
+      color: var(--white);
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+    }
+
+    .page-header-desc {
+      font-size: 15px;
+      color: var(--slate-light);
+      margin-bottom: 28px;
+    }
+
+    /* ── Sticky toolbar ──────────────────────────────────── */
+    .toolbar {
+      position: sticky;
+      top: 60px;
+      z-index: 100;
+      background: rgba(15,23,42,0.96);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border-dark);
+      padding: 14px var(--px);
+    }
+
+    .toolbar-inner {
+      max-width: var(--wrap);
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .search-wrap {
+      position: relative;
+      flex: 0 0 260px;
+    }
+
+    .search-wrap svg {
+      position: absolute;
+      left: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--slate);
+      pointer-events: none;
+    }
+
+    #search {
+      width: 100%;
+      padding: 8px 12px 8px 34px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid var(--border-dark);
+      border-radius: var(--radius);
+      color: var(--white);
+      font-size: 13px;
+      font-family: 'Inter', sans-serif;
+      outline: none;
+      transition: border-color 0.12s;
+    }
+
+    #search::placeholder { color: var(--slate); }
+    #search:focus { border-color: rgba(147,197,253,.4); }
+
+    .chips {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      flex: 1;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 13px;
+      border-radius: 99px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.12s;
+      background: rgba(255,255,255,.06);
+      color: var(--slate-light);
+    }
+
+    .chip:hover { background: rgba(255,255,255,.1); color: var(--white); }
+
+    .chip.active {
+      background: var(--accent-pale);
+      border-color: var(--accent-border);
+      color: var(--accent-text);
+    }
+
+    .chip-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: 0.7;
+    }
+
+    .chip[data-area="query"].active    { --accent-pale: rgba(59,130,246,.18); --accent-border: rgba(59,130,246,.3); --accent-text: #93c5fd; }
+    .chip[data-area="index"].active    { --accent-pale: rgba(34,197,94,.18);  --accent-border: rgba(34,197,94,.3);  --accent-text: #86efac; }
+    .chip[data-area="table"].active    { --accent-pale: rgba(249,115,22,.18); --accent-border: rgba(249,115,22,.3); --accent-text: #fdba74; }
+    .chip[data-area="vacuum"].active   { --accent-pale: rgba(168,85,247,.18); --accent-border: rgba(168,85,247,.3); --accent-text: #d8b4fe; }
+    .chip[data-area="connections"].active { --accent-pale: rgba(245,158,11,.18); --accent-border: rgba(245,158,11,.3); --accent-text: #fcd34d; }
+    .chip[data-area="replication"].active { --accent-pale: rgba(6,182,212,.18); --accent-border: rgba(6,182,212,.3);  --accent-text: #67e8f9; }
+    .chip[data-area="risk"].active     { --accent-pale: rgba(239,68,68,.18);  --accent-border: rgba(239,68,68,.3);  --accent-text: #fca5a5; }
+    .chip[data-area="config"].active   { --accent-pale: rgba(100,116,139,.18);--accent-border: rgba(100,116,139,.3);--accent-text: #cbd5e1; }
+
+    .toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-left: auto;
+    }
+
+    .result-count {
+      font-size: 12px;
+      color: var(--slate);
+      white-space: nowrap;
+    }
+
+    .btn-expand {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid var(--border-dark);
+      border-radius: var(--radius);
+      color: var(--slate-light);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.12s;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .btn-expand:hover { border-color: rgba(255,255,255,.18); color: var(--white); }
+
+    /* ── Main grid ───────────────────────────────────────── */
+    main {
+      max-width: var(--wrap);
+      margin: 0 auto;
+      padding: 28px var(--px) 64px;
+    }
+
+    .sections-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(520px, 1fr));
+      gap: 18px;
+    }
+
+    /* ── Section card ────────────────────────────────────── */
+    .section-card {
+      background: var(--dark-surface);
+      border: 1px solid var(--border-dark);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .section-card:hover {
+      border-color: rgba(255,255,255,.14);
+      box-shadow: 0 4px 20px rgba(0,0,0,.3);
+    }
+
+    /* card head */
+    .card-head {
+      padding: 16px 18px 12px;
+    }
+
+    .card-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .area-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .area-badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .section-num {
+      font-size: 11px;
+      color: var(--slate);
+      font-weight: 500;
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--white);
+      line-height: 1.3;
+    }
+
+    /* card info rows */
+    .card-info {
+      background: rgba(0,0,0,.2);
+      border-top: 1px solid var(--border-dark);
+      border-bottom: 1px solid var(--border-dark);
+      padding: 12px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .info-row {
+      display: grid;
+      grid-template-columns: 72px 1fr;
+      gap: 10px;
+      font-size: 12.5px;
+    }
+
+    .info-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: var(--slate);
+      padding-top: 2px;
+    }
+
+    .info-value { color: var(--slate-lighter); line-height: 1.5; }
+
+    .requires-badge {
+      display: inline-block;
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      background: rgba(251,191,36,.12);
+      color: #fcd34d;
+      font-weight: 600;
+      margin-top: 4px;
+      border: 1px solid rgba(251,191,36,.2);
+    }
+
+    /* sql block */
+    .sql-wrap { }
+
+    .sql-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 18px;
+      cursor: pointer;
+      user-select: none;
+      background: rgba(0,0,0,.18);
+      transition: background 0.1s;
+    }
+
+    .sql-toggle:hover { background: rgba(0,0,0,.28); }
+
+    .sql-toggle-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sql-lbl {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      color: var(--slate);
+    }
+
+    .sql-chevron {
+      display: inline-block;
+      color: var(--slate);
+      transition: transform 0.2s, color 0.2s;
+      font-size: 12px;
+      line-height: 1;
+    }
+
+    .sql-wrap.open .sql-chevron {
+      transform: rotate(180deg);
+      color: var(--accent-text);
+    }
+
+    .sql-toggle-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .copy-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      font-size: 10px;
+      font-weight: 600;
+      background: rgba(255,255,255,.07);
+      border: 1px solid var(--border-dark);
+      border-radius: 4px;
+      color: var(--slate-light);
+      cursor: pointer;
+      transition: all 0.12s;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .copy-btn:hover { border-color: rgba(255,255,255,.2); color: var(--white); }
+    .copy-btn.copied { color: #86efac; border-color: rgba(34,197,94,.3); }
+
+    .sql-content {
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height 0.3s ease;
+    }
+
+    .sql-wrap.open .sql-content { max-height: 1400px; }
+
+    .sql-content pre {
+      margin: 0;
+      border-radius: 0;
+      background: var(--dark-sql) !important;
+      border-top: 1px solid var(--border-dark);
+    }
+
+    .sql-content pre code.hljs {
+      padding: 16px 18px;
+      font-size: 12px;
+      line-height: 1.75;
+      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    }
+
+    /* badge colours per area */
+    .badge-query       { background: rgba(59,130,246,.15); color: #93c5fd; }
+    .badge-index       { background: rgba(34,197,94,.15);  color: #86efac; }
+    .badge-table       { background: rgba(249,115,22,.15); color: #fdba74; }
+    .badge-vacuum      { background: rgba(168,85,247,.15); color: #d8b4fe; }
+    .badge-connections { background: rgba(245,158,11,.15); color: #fcd34d; }
+    .badge-replication { background: rgba(6,182,212,.15);  color: #67e8f9; }
+    .badge-risk        { background: rgba(239,68,68,.15);  color: #fca5a5; }
+    .badge-config      { background: rgba(100,116,139,.15);color: #cbd5e1; }
+
+    /* card left border per area */
+    .card-query       { border-left: 3px solid #3b82f6; }
+    .card-index       { border-left: 3px solid #22c55e; }
+    .card-table       { border-left: 3px solid #f97316; }
+    .card-vacuum      { border-left: 3px solid #a855f7; }
+    .card-connections { border-left: 3px solid #f59e0b; }
+    .card-replication { border-left: 3px solid #06b6d4; }
+    .card-risk        { border-left: 3px solid #ef4444; }
+    .card-config      { border-left: 3px solid #64748b; }
+
+    /* empty state */
+    .empty-state {
+      grid-column: 1/-1;
+      text-align: center;
+      padding: 80px 20px;
+      color: var(--slate);
+    }
+
+    .empty-state p:first-child { font-size: 36px; margin-bottom: 12px; }
+    .empty-state p:last-child  { font-size: 14px; }
+
+    /* hidden */
+    .section-card.hidden { display: none; }
+
+    /* ── Footer ──────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border-dark);
+      padding: 24px var(--px);
+      background: var(--hero-bg);
+    }
+
+    .footer-inner {
+      max-width: var(--wrap);
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      font-size: 13px;
+      color: var(--slate);
+      flex-wrap: wrap;
+    }
+
+    .footer-inner a { color: var(--accent-text); text-decoration: none; }
+    .footer-inner a:hover { text-decoration: underline; }
+
+    /* ── Responsive ──────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .sections-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 680px) {
+      :root { --px: 16px; }
+      .nav-links { display: none; }
+      .search-wrap { flex: 1; min-width: 0; }
+      .toolbar-right { margin-left: 0; width: 100%; justify-content: space-between; }
+      .toolbar-inner { flex-direction: column; align-items: stretch; }
+      .chips { justify-content: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav>
+  <div class="nav-inner">
+    <a class="nav-logo" href="/">🩺 pg<span>vitals</span></a>
+    <ul class="nav-links">
+      <li><a href="/">Home</a></li>
+      <li><a href="/diagnostics.html" class="active">Diagnostics</a></li>
+    </ul>
+    <div class="nav-right">
+      <a class="btn-ghost-dark" href="https://github.com/pgvitals/pgvitals" target="_blank" rel="noopener">
+        <svg height="14" viewBox="0 0 16 16" width="14" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+        GitHub
+      </a>
+    </div>
+  </div>
+</nav>
+
+<!-- Page header -->
+<div class="page-header">
+  <div class="page-header-inner">
+    <div class="breadcrumb">
+      <a href="/">pgvitals</a>
+      <span class="breadcrumb-sep">/</span>
+      <span>Diagnostics</span>
+    </div>
+    <h1>SQL Diagnostic Sections</h1>
+    <p class="page-header-desc">32 sections across 8 areas. Search, filter by area, expand to view and copy SQL.</p>
+  </div>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <div class="toolbar-inner">
+    <div class="search-wrap">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input id="search" type="text" placeholder="Search sections…" autocomplete="off" spellcheck="false" />
+    </div>
+    <div class="chips">
+      <div class="chip active" data-area="all" onclick="filterArea(this)">All</div>
+      <div class="chip" data-area="query"       onclick="filterArea(this)"><span class="chip-dot" style="color:#3b82f6"></span>Query</div>
+      <div class="chip" data-area="index"       onclick="filterArea(this)"><span class="chip-dot" style="color:#22c55e"></span>Index</div>
+      <div class="chip" data-area="table"       onclick="filterArea(this)"><span class="chip-dot" style="color:#f97316"></span>Tables</div>
+      <div class="chip" data-area="vacuum"      onclick="filterArea(this)"><span class="chip-dot" style="color:#a855f7"></span>Vacuum</div>
+      <div class="chip" data-area="connections" onclick="filterArea(this)"><span class="chip-dot" style="color:#f59e0b"></span>Connections</div>
+      <div class="chip" data-area="replication" onclick="filterArea(this)"><span class="chip-dot" style="color:#06b6d4"></span>Replication</div>
+      <div class="chip" data-area="risk"        onclick="filterArea(this)"><span class="chip-dot" style="color:#ef4444"></span>Risk</div>
+      <div class="chip" data-area="config"      onclick="filterArea(this)"><span class="chip-dot" style="color:#64748b"></span>Config</div>
+    </div>
+    <div class="toolbar-right">
+      <span class="result-count" id="result-count"></span>
+      <button class="btn-expand" onclick="toggleAll()">
+        <svg id="expand-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+        <span id="expand-label">Expand All SQL</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Main -->
+<main>
+  <div class="sections-grid" id="grid">
+    <!-- Cards rendered by JS -->
+  </div>
+</main>
+
+<!-- Footer -->
+<footer>
+  <div class="footer-inner">
+    <span>🩺 <strong>pgvitals</strong> — MIT License</span>
+    <span>
+      <a href="/">Home</a> ·
+      <a href="https://github.com/pgvitals/pgvitals" target="_blank">GitHub</a> ·
+      <a href="https://github.com/pgvitals/pgvitals/blob/master/master.sql" target="_blank">Download master.sql</a>
+    </span>
+  </div>
+</footer>
+
+<script src="sections.js"></script>
+<script>
+  let activeArea = 'all';
+  let allExpanded = false;
+
+  const AREA_LABELS = {
+    query: 'Query Behavior',
+    index: 'Index Health',
+    table: 'Tables & Storage',
+    vacuum: 'Vacuum & Stats',
+    connections: 'Connections & Locks',
+    replication: 'Replication',
+    risk: 'Risk Signals',
+    config: 'Config & Health',
+  };
+
+  function buildCards() {
+    const grid = document.getElementById('grid');
+    grid.innerHTML = '';
+    SECTIONS.forEach((s, i) => {
+      const card = document.createElement('div');
+      card.className = `section-card card-${s.areaSlug}`;
+      card.dataset.area = s.areaSlug;
+      card.dataset.search = `${s.id} ${s.title} ${s.area} ${s.what} ${s.lookFor} ${s.action} ${s.sql}`.toLowerCase();
+
+      const requiresBadge = s.requires
+        ? `<div class="requires-badge">Requires: ${s.requires}</div>`
+        : '';
+
+      card.innerHTML = `
+        <div class="card-head">
+          <div class="card-meta">
+            <span class="area-badge badge-${s.areaSlug}">
+              <span class="area-badge-dot"></span>
+              ${AREA_LABELS[s.areaSlug] || s.area}
+            </span>
+            <span class="section-num">#${String(s.id).padStart(2,'0')}</span>
+          </div>
+          <div class="card-title">${s.title}</div>
+        </div>
+        <div class="card-info">
+          <div class="info-row">
+            <span class="info-label">What</span>
+            <span class="info-value">${s.what}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Look for</span>
+            <span class="info-value">${s.lookFor}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Action</span>
+            <span class="info-value">${s.action}</span>
+          </div>
+          ${requiresBadge}
+        </div>
+        <div class="sql-wrap" id="wrap-${i}">
+          <div class="sql-toggle" onclick="toggleSQL(this)">
+            <div class="sql-toggle-left">
+              <span class="sql-lbl">SQL</span>
+              <span class="sql-chevron">▾</span>
+            </div>
+            <div class="sql-toggle-right">
+              <button class="copy-btn" onclick="event.stopPropagation();copySQL(this,${i})">Copy</button>
+            </div>
+          </div>
+          <div class="sql-content">
+            <pre><code class="language-sql" id="sql-${i}"></code></pre>
+          </div>
+        </div>
+      `;
+
+      // set text content to avoid XSS
+      card.querySelector(`#sql-${i}`).textContent = s.sql.trim();
+      grid.appendChild(card);
+    });
+
+    // syntax highlight
+    document.querySelectorAll('pre code.language-sql').forEach(el => {
+      hljs.highlightElement(el);
+    });
+
+    updateCount();
+  }
+
+  function toggleSQL(toggle) {
+    toggle.closest('.sql-wrap').classList.toggle('open');
+  }
+
+  function toggleAll() {
+    allExpanded = !allExpanded;
+    document.querySelectorAll('.section-card:not(.hidden) .sql-wrap')
+      .forEach(w => w.classList.toggle('open', allExpanded));
+    document.getElementById('expand-label').textContent = allExpanded ? 'Collapse All SQL' : 'Expand All SQL';
+    document.getElementById('expand-icon').innerHTML = allExpanded
+      ? '<path d="M18 15l-6-6-6 6"/>'
+      : '<path d="M6 9l6 6 6-6"/>';
+  }
+
+  function copySQL(btn, idx) {
+    const text = document.getElementById(`sql-${idx}`).textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+    });
+  }
+
+  function filterArea(chip) {
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    activeArea = chip.dataset.area;
+    applyFilters();
+  }
+
+  function applyFilters() {
+    const q = document.getElementById('search').value.toLowerCase().trim();
+    let visible = 0;
+    document.querySelectorAll('.section-card').forEach(card => {
+      const areaMatch = activeArea === 'all' || card.dataset.area === activeArea;
+      const searchMatch = !q || card.dataset.search.includes(q);
+      const show = areaMatch && searchMatch;
+      card.classList.toggle('hidden', !show);
+      if (show) visible++;
+    });
+
+    // empty state
+    const grid = document.getElementById('grid');
+    const existing = grid.querySelector('.empty-state');
+    if (existing) existing.remove();
+    if (visible === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty-state';
+      empty.innerHTML = '<p>🔍</p><p>No sections match your filter.</p>';
+      grid.appendChild(empty);
+    }
+
+    updateCount();
+  }
+
+  function updateCount() {
+    const visible = document.querySelectorAll('.section-card:not(.hidden)').length;
+    const total = SECTIONS.length;
+    const el = document.getElementById('result-count');
+    el.textContent = visible === total ? `${total} sections` : `${visible} of ${total}`;
+  }
+
+  document.getElementById('search').addEventListener('input', applyFilters);
+
+  buildCards();
+</script>
+</body>
+</html>

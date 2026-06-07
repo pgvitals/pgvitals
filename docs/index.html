@@ -4,768 +4,1045 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>pgvitals — PostgreSQL Performance Diagnostics</title>
-  <meta name="description" content="32 copy-paste PostgreSQL diagnostic queries covering every performance bottleneck. No extensions. No installation. Just SQL." />
+  <meta name="description" content="32 copy-paste PostgreSQL diagnostic queries covering every performance bottleneck. No install. No agents. Just SQL." />
   <meta property="og:title" content="pgvitals — PostgreSQL Performance Diagnostics" />
-  <meta property="og:description" content="32 copy-paste SQL queries for every PostgreSQL bottleneck: slow queries, bloat, locks, replication lag, wraparound risk and more." />
-  <meta property="og:type" content="website" />
+  <meta property="og:description" content="32 copy-paste SQL queries for every PostgreSQL bottleneck — slow queries, bloat, locks, replication lag, wraparound risk and more." />
   <meta property="og:url" content="https://pgvitals.github.io/" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+  <meta property="og:type" content="website" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:        #0d1117;
-      --surface:   #161b22;
-      --surface2:  #1c2128;
-      --border:    #21262d;
-      --border2:   #30363d;
-      --text:      #e6edf3;
-      --text2:     #8b949e;
-      --text3:     #6e7681;
-      --blue:      #58a6ff;
-      --green:     #3fb950;
-      --orange:    #f0883e;
-      --purple:    #bc8cff;
-      --amber:     #ffa657;
-      --cyan:      #79c0ff;
-      --red:       #f85149;
-      --gray:      #848d97;
-      --radius:    8px;
-      --radius-lg: 12px;
+      --accent:        #1d4ed8;
+      --accent-light:  #2563eb;
+      --accent-pale:   #eff6ff;
+      --accent-border: #bfdbfe;
+      --accent-text:   #93c5fd;
+      --hero-bg:       #0f172a;
+      --dark-surface:  #1e293b;
+      --dark-surface2: #273349;
+      --ink:           #0f172a;
+      --ink-mid:       #334155;
+      --slate:         #64748b;
+      --slate-light:   #94a3b8;
+      --border:        #e2e8f0;
+      --bg:            #f8fafc;
+      --white:         #ffffff;
+      --green:         #15803d;
+      --green-pale:    #f0fdf4;
+      --green-border:  #bbf7d0;
+      --wrap:          1160px;
+      --px:            32px;
+      --radius:        6px;
+      --radius-lg:     12px;
+      --radius-xl:     18px;
+
+      /* area colours */
+      --col-query:       #3b82f6;
+      --col-index:       #22c55e;
+      --col-table:       #f97316;
+      --col-vacuum:      #a855f7;
+      --col-connections: #f59e0b;
+      --col-replication: #06b6d4;
+      --col-risk:        #ef4444;
+      --col-config:      #64748b;
     }
 
     html { scroll-behavior: smooth; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.6;
-      min-height: 100vh;
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--white);
+      color: var(--ink);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
     }
 
-    /* ── Header ─────────────────────────────────────────── */
-    header {
+    /* ── Utility ─────────────────────────────────────────── */
+    .container { max-width: var(--wrap); margin: 0 auto; padding: 0 var(--px); }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+
+    /* ── Nav ─────────────────────────────────────────────── */
+    nav {
       position: sticky;
       top: 0;
-      z-index: 100;
-      background: rgba(13, 17, 23, 0.92);
-      backdrop-filter: blur(12px);
+      z-index: 200;
+      background: rgba(255,255,255,0.96);
+      backdrop-filter: blur(14px);
       border-bottom: 1px solid var(--border);
-      padding: 0 24px;
     }
 
-    .header-inner {
-      max-width: 1400px;
+    .nav-inner {
+      max-width: var(--wrap);
       margin: 0 auto;
+      padding: 0 var(--px);
+      height: 60px;
       display: flex;
       align-items: center;
-      gap: 20px;
-      height: 60px;
+      gap: 32px;
     }
 
-    .logo {
+    .nav-logo {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       text-decoration: none;
+      font-weight: 800;
+      font-size: 18px;
+      color: var(--ink);
+      letter-spacing: -0.4px;
       flex-shrink: 0;
     }
 
-    .logo-icon {
-      font-size: 22px;
-      line-height: 1;
+    .nav-logo span { color: var(--accent); }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      list-style: none;
     }
 
-    .logo-name {
-      font-size: 18px;
-      font-weight: 700;
-      color: var(--text);
-      letter-spacing: -0.3px;
-    }
-
-    .logo-name span { color: var(--blue); }
-
-    .header-search {
-      flex: 1;
-      max-width: 480px;
-      position: relative;
-    }
-
-    .header-search input {
-      width: 100%;
-      background: var(--surface2);
-      border: 1px solid var(--border2);
-      border-radius: var(--radius);
-      color: var(--text);
+    .nav-links a {
+      padding: 6px 12px;
       font-size: 14px;
-      padding: 7px 14px 7px 36px;
-      outline: none;
-      transition: border-color 0.15s;
+      font-weight: 500;
+      color: var(--ink-mid);
+      text-decoration: none;
+      border-radius: var(--radius);
+      transition: background 0.12s, color 0.12s;
     }
 
-    .header-search input:focus { border-color: var(--blue); }
-    .header-search input::placeholder { color: var(--text3); }
+    .nav-links a:hover { background: var(--bg); color: var(--ink); }
+    .nav-links a.active { color: var(--accent); font-weight: 600; }
 
-    .search-icon {
+    .nav-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-ghost {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink-mid);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      text-decoration: none;
+      transition: all 0.12s;
+      background: var(--white);
+    }
+
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 20px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--white);
+      background: var(--accent);
+      border: 1px solid transparent;
+      border-radius: var(--radius);
+      text-decoration: none;
+      transition: background 0.12s;
+    }
+
+    .btn-primary:hover { background: var(--accent-light); }
+
+    /* ── Hero ────────────────────────────────────────────── */
+    .hero {
+      background: var(--hero-bg);
+      position: relative;
+      overflow: hidden;
+      padding: 96px var(--px) 88px;
+    }
+
+    /* dot grid */
+    .hero::before {
+      content: '';
       position: absolute;
-      left: 11px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--text3);
-      font-size: 15px;
+      inset: 0;
+      background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1px);
+      background-size: 30px 30px;
       pointer-events: none;
     }
 
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-left: auto;
-      flex-shrink: 0;
+    /* radial glow */
+    .hero::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 60% 70% at 65% 50%, rgba(37,99,235,.22) 0%, transparent 70%);
+      pointer-events: none;
     }
 
-    .btn-github {
-      display: flex;
+    .hero-inner {
+      max-width: var(--wrap);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 480px;
+      gap: 64px;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-tag {
+      display: inline-flex;
       align-items: center;
       gap: 6px;
-      background: var(--surface);
-      border: 1px solid var(--border2);
-      border-radius: var(--radius);
-      color: var(--text);
-      font-size: 13px;
-      font-weight: 500;
-      padding: 6px 14px;
-      text-decoration: none;
-      transition: border-color 0.15s, background 0.15s;
-    }
-
-    .btn-github:hover { border-color: var(--blue); background: var(--surface2); }
-
-    .result-count {
-      font-size: 13px;
-      color: var(--text3);
-      flex-shrink: 0;
-    }
-
-    /* ── Hero ───────────────────────────────────────────── */
-    .hero {
-      text-align: center;
-      padding: 56px 24px 40px;
-      max-width: 700px;
-      margin: 0 auto;
+      background: rgba(37,99,235,.18);
+      border: 1px solid rgba(147,197,253,.25);
+      color: var(--accent-text);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 99px;
+      margin-bottom: 24px;
     }
 
     .hero h1 {
-      font-size: clamp(28px, 5vw, 42px);
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: clamp(2.4rem, 4.5vw, 3.8rem);
       font-weight: 800;
+      color: var(--white);
+      line-height: 1.15;
       letter-spacing: -1px;
-      line-height: 1.2;
-      margin-bottom: 16px;
-      background: linear-gradient(135deg, var(--text) 0%, var(--blue) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      margin-bottom: 20px;
     }
 
-    .hero p {
-      font-size: 17px;
-      color: var(--text2);
-      max-width: 540px;
-      margin: 0 auto 28px;
+    .hero h1 em {
+      font-style: normal;
+      color: var(--accent-text);
+    }
+
+    .hero-desc {
+      font-size: 1.1rem;
+      color: var(--slate-light);
+      max-width: 500px;
+      margin-bottom: 36px;
       line-height: 1.7;
     }
 
-    .hero-badges {
+    .hero-ctas {
       display: flex;
-      justify-content: center;
-      gap: 10px;
+      gap: 12px;
       flex-wrap: wrap;
     }
 
-    .badge {
+    .btn-hero-primary {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
-      background: var(--surface);
-      border: 1px solid var(--border2);
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--text2);
-      padding: 4px 12px;
-    }
-
-    .badge .dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--green);
-    }
-
-    /* ── Filters ────────────────────────────────────────── */
-    .filters-wrap {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 0 24px 20px;
-      display: flex;
       gap: 8px;
-      flex-wrap: wrap;
-      align-items: center;
+      padding: 13px 28px;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--white);
+      background: var(--accent);
+      border-radius: var(--radius);
+      text-decoration: none;
+      transition: background 0.12s, transform 0.12s;
     }
 
-    .filter-chip {
+    .btn-hero-primary:hover { background: var(--accent-light); transform: translateY(-1px); }
+
+    .btn-hero-ghost {
       display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--slate-light);
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: var(--radius);
+      text-decoration: none;
+      transition: border-color 0.12s, color 0.12s;
+    }
+
+    .btn-hero-ghost:hover { border-color: rgba(255,255,255,.35); color: var(--white); }
+
+    /* ── Hero mockup ─────────────────────────────────────── */
+    .hero-mockup {
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 12px;
+    }
+
+    .mockup-bar {
+      background: rgba(255,255,255,.06);
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      padding: 10px 16px;
+      display: flex;
       align-items: center;
       gap: 6px;
-      padding: 5px 14px;
-      border-radius: 20px;
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      border: 1px solid var(--border2);
-      background: var(--surface);
-      color: var(--text2);
-      transition: all 0.15s;
-      user-select: none;
     }
 
-    .filter-chip:hover { border-color: var(--blue); color: var(--text); }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot-red    { background: #ff5f57; }
+    .dot-yellow { background: #febc2e; }
+    .dot-green  { background: #28c840; }
 
-    .filter-chip.active {
-      color: #fff;
-      border-color: transparent;
-    }
-
-    .filter-chip .chip-count {
-      background: rgba(255,255,255,0.15);
-      border-radius: 10px;
-      padding: 1px 7px;
+    .mockup-url {
+      flex: 1;
+      background: rgba(255,255,255,.06);
+      border-radius: 4px;
+      padding: 3px 10px;
       font-size: 11px;
+      color: var(--slate-light);
+      text-align: center;
     }
 
-    /* ── Grid ───────────────────────────────────────────── */
-    .grid-wrap {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 0 24px 60px;
-    }
-
-    .sections-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(540px, 1fr));
-      gap: 16px;
-    }
-
-    /* ── Section Card ───────────────────────────────────── */
-    .section-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
+    .mockup-card {
+      margin: 16px;
+      background: var(--dark-surface);
+      border: 1px solid rgba(255,255,255,.08);
       border-radius: var(--radius-lg);
       overflow: hidden;
-      transition: border-color 0.15s;
     }
 
-    .section-card:hover { border-color: var(--border2); }
-
-    .card-header {
-      padding: 16px 20px 14px;
+    .mockup-card-head {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
     }
 
-    .card-meta {
+    .mockup-badge-row {
       display: flex;
       align-items: center;
       gap: 8px;
       margin-bottom: 6px;
     }
 
-    /* ── Collapsible SQL ────────────────────────────────── */
-    .sql-content {
-      overflow: hidden;
-      max-height: 0;
-      transition: max-height 0.3s ease;
-    }
-
-    .sql-wrap.open .sql-content {
-      max-height: 1200px;
-    }
-
-    /* ── Chevron ────────────────────────────────────────── */
-    .chevron {
-      flex-shrink: 0;
-      color: var(--text3);
-      transition: transform 0.25s ease, color 0.15s;
-    }
-
-    .sql-toolbar:hover .chevron { color: var(--text2); }
-    .sql-wrap.open .chevron { transform: rotate(180deg); color: var(--blue); }
-
-    /* ── SQL toolbar — clickable to toggle ─────────────── */
-    .sql-toolbar {
-      cursor: pointer;
-      user-select: none;
-    }
-
-    .sql-toolbar:hover { background: #1a2030; }
-
-    /* ── Expand all button ──────────────────────────────── */
-    .btn-expand-all {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      background: transparent;
-      border: 1px solid var(--border2);
-      border-radius: var(--radius);
-      color: var(--text2);
-      font-size: 12px;
-      font-weight: 500;
-      padding: 5px 12px;
-      cursor: pointer;
-      transition: all 0.15s;
-      margin-left: auto;
-    }
-
-    .btn-expand-all:hover { border-color: var(--blue); color: var(--blue); }
-
-    .area-badge {
-      font-size: 10px;
+    .mockup-badge {
+      font-size: 9px;
       font-weight: 700;
-      letter-spacing: 0.6px;
+      letter-spacing: 0.5px;
       text-transform: uppercase;
       padding: 2px 8px;
       border-radius: 4px;
+      background: rgba(59,130,246,.18);
+      color: #93c5fd;
+      font-family: 'Inter', sans-serif;
     }
 
-    .section-num {
-      font-size: 12px;
-      color: var(--text3);
-      font-weight: 600;
-      font-variant-numeric: tabular-nums;
-    }
+    .mockup-num { font-size: 10px; color: #475569; font-family: 'Inter', sans-serif; }
+    .mockup-title { font-size: 13px; font-weight: 700; color: #e2e8f0; font-family: 'Inter', sans-serif; }
 
-    .card-title {
-      font-size: 15px;
-      font-weight: 700;
-      color: var(--text);
-      letter-spacing: -0.2px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    /* ── Info rows ──────────────────────────────────────── */
-    .card-info {
-      padding: 12px 20px;
+    .mockup-info {
+      padding: 10px 16px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      background: rgba(0,0,0,.15);
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      border-bottom: 1px solid var(--border);
-      background: var(--surface2);
+      gap: 5px;
     }
 
-    .info-row {
+    .mockup-row {
       display: grid;
-      grid-template-columns: 78px 1fr;
+      grid-template-columns: 60px 1fr;
       gap: 8px;
-      font-size: 13px;
-      line-height: 1.5;
+      font-size: 10px;
+      font-family: 'Inter', sans-serif;
     }
 
-    .info-label {
-      font-weight: 600;
-      color: var(--text3);
-      font-size: 11px;
-      letter-spacing: 0.4px;
-      text-transform: uppercase;
-      padding-top: 2px;
-    }
+    .mockup-lbl { color: #475569; font-weight: 600; text-transform: uppercase; font-size: 9px; letter-spacing: 0.3px; padding-top: 1px; }
+    .mockup-val { color: #94a3b8; }
+    .mockup-val .hl { color: #fbbf24; }
 
-    .info-value { color: var(--text2); }
-
-    .info-value code {
-      background: var(--border);
-      padding: 1px 5px;
-      border-radius: 3px;
-      font-family: "SFMono-Regular", Consolas, monospace;
-      font-size: 12px;
-      color: var(--orange);
-    }
-
-    .requires-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 11px;
-      background: rgba(88, 166, 255, 0.1);
-      border: 1px solid rgba(88, 166, 255, 0.2);
-      color: var(--blue);
-      padding: 1px 8px;
-      border-radius: 4px;
-      margin-top: 2px;
-    }
-
-    /* ── SQL Block ──────────────────────────────────────── */
-    .sql-wrap {
-      flex: 1;
-      position: relative;
-    }
-
-    .sql-toolbar {
+    .mockup-sql-bar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 8px 14px;
-      border-bottom: 1px solid var(--border);
-      background: var(--surface2);
+      padding: 7px 16px;
+      background: rgba(0,0,0,.2);
+      border-bottom: 1px solid rgba(255,255,255,.05);
+      font-family: 'Inter', sans-serif;
     }
 
-    .sql-label {
+    .mockup-sql-lbl { font-size: 9px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: #475569; }
+
+    .mockup-copy {
+      font-size: 9px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 3px;
+      padding: 2px 8px;
+      color: #64748b;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .mockup-code {
+      padding: 12px 16px;
+      color: #64748b;
+      line-height: 1.7;
+    }
+
+    .kw  { color: #7dd3fc; }
+    .fn  { color: #a78bfa; }
+    .str { color: #86efac; }
+    .cm  { color: #475569; }
+    .num { color: #fcd34d; }
+
+    /* ── Stats strip ─────────────────────────────────────── */
+    .stats-strip {
+      border-bottom: 1px solid var(--border);
+      padding: 28px var(--px);
+    }
+
+    .stats-inner {
+      max-width: var(--wrap);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 4px;
+    }
+
+    .stat-value {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: clamp(2rem, 3.5vw, 2.6rem);
+      font-weight: 800;
+      color: var(--ink);
+      letter-spacing: -1px;
+      line-height: 1;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      color: var(--slate);
+      font-weight: 500;
+    }
+
+    /* ── Section headings ────────────────────────────────── */
+    .section { padding: 88px var(--px); }
+    .section.alt { background: var(--bg); }
+    .section.dark { background: var(--hero-bg); position: relative; overflow: hidden; }
+
+    .section.dark::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(rgba(255,255,255,.04) 1px, transparent 1px);
+      background-size: 30px 30px;
+    }
+
+    .section.dark::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 50% 60% at 50% 100%, rgba(37,99,235,.2) 0%, transparent 70%);
+    }
+
+    .section-inner { max-width: var(--wrap); margin: 0 auto; position: relative; z-index: 1; }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+
+    .section-label.light { color: var(--accent-text); }
+
+    .section-heading {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: clamp(1.8rem, 3vw, 2.6rem);
+      font-weight: 800;
+      color: var(--ink);
+      letter-spacing: -0.5px;
+      line-height: 1.2;
+      margin-bottom: 16px;
+    }
+
+    .section-heading.light { color: var(--white); }
+
+    .section-sub {
+      font-size: 1.05rem;
+      color: var(--slate);
+      max-width: 560px;
+      margin-bottom: 52px;
+      line-height: 1.7;
+    }
+
+    .section-sub.light { color: var(--slate-light); }
+
+    /* ── Coverage cards ──────────────────────────────────── */
+    .coverage-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+    }
+
+    .cov-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s;
+    }
+
+    .cov-card:hover {
+      box-shadow: 0 6px 24px rgba(0,0,0,.08);
+      transform: translateY(-2px);
+      border-color: var(--accent-border);
+    }
+
+    .cov-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 9px;
+      background: var(--accent-pale);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      margin-bottom: 14px;
+    }
+
+    .cov-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 6px;
+    }
+
+    .cov-sections {
       font-size: 11px;
       font-weight: 600;
-      color: var(--text3);
-      letter-spacing: 0.6px;
+      color: var(--accent);
+      margin-bottom: 8px;
       text-transform: uppercase;
+      letter-spacing: 0.4px;
     }
 
-    .copy-btn {
+    .cov-desc {
+      font-size: 13px;
+      color: var(--slate);
+      line-height: 1.6;
+    }
+
+    /* ── How to use ──────────────────────────────────────── */
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 32px;
+    }
+
+    .step-card {
+      position: relative;
+    }
+
+    .step-num {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
-      background: var(--surface);
-      border: 1px solid var(--border2);
-      border-radius: 5px;
-      color: var(--text2);
-      font-size: 12px;
-      font-weight: 500;
-      padding: 4px 10px;
-      cursor: pointer;
-      transition: all 0.15s;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      background: var(--accent-pale);
+      color: var(--accent);
+      border-radius: 99px;
+      font-size: 14px;
+      font-weight: 800;
+      margin-bottom: 16px;
     }
 
-    .copy-btn:hover { border-color: var(--blue); color: var(--blue); }
-    .copy-btn.copied { border-color: var(--green); color: var(--green); }
-
-    .sql-block {
-      margin: 0;
-      overflow-x: auto;
-      max-height: 320px;
-      overflow-y: auto;
+    .step-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 8px;
     }
 
-    .sql-block code.hljs {
-      padding: 16px 20px;
-      font-size: 12.5px;
+    .step-desc {
+      font-size: 14px;
+      color: var(--slate);
       line-height: 1.7;
-      background: transparent !important;
     }
 
-    /* custom scrollbar */
-    .sql-block::-webkit-scrollbar { width: 6px; height: 6px; }
-    .sql-block::-webkit-scrollbar-track { background: transparent; }
-    .sql-block::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
-
-    /* override hljs background */
-    .hljs { background: var(--surface2) !important; }
-
-    /* ── Empty state ────────────────────────────────────── */
-    .empty-state {
-      grid-column: 1 / -1;
-      text-align: center;
-      padding: 80px 20px;
-      color: var(--text3);
+    .step-code {
+      margin-top: 14px;
+      background: var(--ink);
+      color: #7dd3fc;
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.7;
     }
 
-    .empty-state .empty-icon { font-size: 48px; margin-bottom: 16px; }
-    .empty-state h3 { font-size: 18px; color: var(--text2); margin-bottom: 8px; }
+    /* ── Monitoring section ──────────────────────────────── */
+    .monitoring-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 64px;
+      align-items: center;
+    }
 
-    /* ── Footer ─────────────────────────────────────────── */
-    footer {
-      border-top: 1px solid var(--border);
-      padding: 24px;
-      text-align: center;
-      color: var(--text3);
+    .monitoring-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      margin-top: 20px;
+    }
+
+    .mon-step {
+      display: flex;
+      gap: 16px;
+    }
+
+    .mon-step-badge {
+      width: 28px;
+      height: 28px;
+      border-radius: 99px;
+      background: var(--accent-pale);
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .mon-step-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 3px;
+    }
+
+    .mon-step-desc {
+      font-size: 13px;
+      color: var(--slate);
+      line-height: 1.6;
+    }
+
+    .monitoring-terminal {
+      background: var(--ink);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      font-family: 'SFMono-Regular', Consolas, monospace;
       font-size: 13px;
     }
 
-    footer a { color: var(--blue); text-decoration: none; }
-    footer a:hover { text-decoration: underline; }
+    .terminal-bar {
+      background: #1e293b;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
 
-    /* ── Area colors ─────────────────────────────────────── */
-    .area-query      { background: rgba(88,166,255,0.12); color: #58a6ff; }
-    .area-index      { background: rgba(63,185,80,0.12);  color: #3fb950; }
-    .area-table      { background: rgba(240,136,62,0.12); color: #f0883e; }
-    .area-vacuum     { background: rgba(188,140,255,0.12);color: #bc8cff; }
-    .area-connections{ background: rgba(255,166,87,0.12); color: #ffa657; }
-    .area-replication{ background: rgba(121,192,255,0.12);color: #79c0ff; }
-    .area-risk       { background: rgba(248,81,73,0.12);  color: #f85149; }
-    .area-config     { background: rgba(132,141,151,0.12);color: #848d97; }
+    .terminal-title {
+      font-size: 11px;
+      color: var(--slate);
+      font-family: 'Inter', sans-serif;
+      margin-left: 8px;
+    }
 
-    .chip-query      { background: #58a6ff; }
-    .chip-index      { background: #3fb950; }
-    .chip-table      { background: #f0883e; }
-    .chip-vacuum     { background: #bc8cff; }
-    .chip-connections{ background: #ffa657; }
-    .chip-replication{ background: #79c0ff; }
-    .chip-risk       { background: #f85149; }
-    .chip-config     { background: #848d97; }
+    .terminal-body { padding: 20px; line-height: 1.9; }
+    .t-prompt { color: #22c55e; }
+    .t-cmd    { color: #e2e8f0; }
+    .t-comment{ color: #475569; }
+    .t-out    { color: #64748b; }
+    .t-hi     { color: #7dd3fc; }
 
-    /* ── Responsive ─────────────────────────────────────── */
-    @media (max-width: 700px) {
-      .sections-grid { grid-template-columns: 1fr; }
-      .logo-name { display: none; }
-      .hero h1 { font-size: 26px; }
-      .hero p { font-size: 15px; }
-      .btn-github span { display: none; }
+    /* ── CTA section ─────────────────────────────────────── */
+    .cta-inner {
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .cta-inner .section-heading { margin-bottom: 16px; }
+    .cta-inner .section-sub { margin: 0 auto 36px; }
+
+    .cta-actions {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn-cta-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 32px;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--white);
+      background: var(--accent);
+      border-radius: var(--radius);
+      text-decoration: none;
+      transition: background 0.12s, transform 0.12s;
+    }
+
+    .btn-cta-primary:hover { background: var(--accent-light); transform: translateY(-1px); }
+
+    .btn-cta-ghost {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 13px 28px;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--slate-light);
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: var(--radius);
+      text-decoration: none;
+      transition: all 0.12s;
+    }
+
+    .btn-cta-ghost:hover { border-color: rgba(255,255,255,.35); color: var(--white); }
+
+    /* ── Footer ──────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 28px var(--px);
+    }
+
+    .footer-inner {
+      max-width: var(--wrap);
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      font-size: 13px;
+      color: var(--slate);
+      flex-wrap: wrap;
+    }
+
+    .footer-inner a { color: var(--accent); text-decoration: none; }
+    .footer-inner a:hover { text-decoration: underline; }
+
+    /* ── Responsive ──────────────────────────────────────── */
+    @media (max-width: 1000px) {
+      .hero-inner { grid-template-columns: 1fr; }
+      .hero-mockup { display: none; }
+      .coverage-grid { grid-template-columns: repeat(2, 1fr); }
+      .monitoring-split { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 680px) {
+      :root { --px: 20px; }
+      .section { padding: 64px var(--px); }
+      .coverage-grid { grid-template-columns: 1fr; }
+      .steps-grid { grid-template-columns: 1fr; }
+      .stats-inner { grid-template-columns: repeat(2, 1fr); }
+      .nav-links { display: none; }
     }
   </style>
 </head>
 <body>
 
-<!-- Header -->
-<header>
-  <div class="header-inner">
-    <a class="logo" href="#">
-      <span class="logo-icon">🩺</span>
-      <span class="logo-name">pg<span>vitals</span></span>
-    </a>
-    <div class="header-search">
-      <span class="search-icon">⌕</span>
-      <input type="text" id="search-input" placeholder="Search sections, SQL, keywords…" autocomplete="off" />
-    </div>
-    <span class="result-count" id="result-count"></span>
-    <div class="header-actions">
-      <a class="btn-github" href="https://github.com/pgvitals/pgvitals" target="_blank" rel="noopener">
-        <svg height="16" viewBox="0 0 16 16" width="16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
-        <span>GitHub</span>
+<!-- Nav -->
+<nav>
+  <div class="nav-inner">
+    <a class="nav-logo" href="/">🩺 pg<span>vitals</span></a>
+    <ul class="nav-links">
+      <li><a href="/" class="active">Home</a></li>
+      <li><a href="/diagnostics.html">Diagnostics</a></li>
+    </ul>
+    <div class="nav-right">
+      <a class="btn-ghost" href="https://github.com/pgvitals/pgvitals" target="_blank" rel="noopener">
+        <svg height="14" viewBox="0 0 16 16" width="14" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+        GitHub
       </a>
+      <a class="btn-primary" href="/diagnostics.html">Open Diagnostics →</a>
     </div>
   </div>
-</header>
+</nav>
 
 <!-- Hero -->
 <section class="hero">
-  <h1>PostgreSQL Performance Diagnostics</h1>
-  <p>32 copy-paste SQL queries that cover every performance bottleneck. Run during an incident, before a release, or wire into a load test.</p>
-  <div class="hero-badges">
-    <span class="badge"><span class="dot"></span> 32 sections</span>
-    <span class="badge">PostgreSQL 14+</span>
-    <span class="badge">Zero dependencies</span>
-    <span class="badge">MIT License</span>
+  <div class="hero-inner">
+    <div class="hero-text">
+      <div class="hero-tag">
+        <span>🩺</span> PostgreSQL Diagnostics
+      </div>
+      <h1>Stop Guessing.<br><em>Start Diagnosing.</em></h1>
+      <p class="hero-desc">32 copy-paste SQL queries that cover every PostgreSQL performance bottleneck. Run them in psql, pgAdmin, or any SQL client. No agents. No install. Just SQL.</p>
+      <div class="hero-ctas">
+        <a class="btn-hero-primary" href="/diagnostics.html">Open Diagnostics →</a>
+        <a class="btn-hero-ghost" href="https://github.com/pgvitals/pgvitals" target="_blank" rel="noopener">
+          <svg height="15" viewBox="0 0 16 16" width="15" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+          View on GitHub
+        </a>
+      </div>
+    </div>
+
+    <!-- CSS Mockup -->
+    <div class="hero-mockup">
+      <div class="mockup-bar">
+        <div class="dot dot-red"></div>
+        <div class="dot dot-yellow"></div>
+        <div class="dot dot-green"></div>
+        <div class="mockup-url">pgvitals.github.io/diagnostics</div>
+      </div>
+      <div class="mockup-card">
+        <div class="mockup-card-head">
+          <div class="mockup-badge-row">
+            <span class="mockup-badge">Query Behavior</span>
+            <span class="mockup-num">#01</span>
+          </div>
+          <div class="mockup-title">Slow / Expensive Queries</div>
+        </div>
+        <div class="mockup-info">
+          <div class="mockup-row"><span class="mockup-lbl">What</span><span class="mockup-val">Top queries by total CPU time</span></div>
+          <div class="mockup-row"><span class="mockup-lbl">Look for</span><span class="mockup-val"><span class="hl">mean_exec_ms &gt; 100</span></span></div>
+          <div class="mockup-row"><span class="mockup-lbl">Action</span><span class="mockup-val">EXPLAIN ANALYZE top offenders</span></div>
+        </div>
+        <div class="mockup-sql-bar">
+          <span class="mockup-sql-lbl">SQL</span>
+          <span class="mockup-copy">Copy</span>
+        </div>
+        <div class="mockup-code">
+          <span class="kw">SELECT</span> <span class="fn">round</span>(total_exec_time, <span class="num">2</span>) <span class="kw">AS</span> total_ms,<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;calls, <span class="fn">round</span>(mean_exec_time, <span class="num">2</span>) <span class="kw">AS</span> mean_ms,<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;<span class="fn">left</span>(query, <span class="num">120</span>) <span class="kw">AS</span> query_snippet<br>
+          <span class="kw">FROM</span> pg_stat_statements<br>
+          <span class="kw">ORDER BY</span> total_exec_time <span class="kw">DESC</span><br>
+          <span class="kw">LIMIT</span> <span class="num">25</span>;
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
-<!-- Filters -->
-<div class="filters-wrap" id="filters"></div>
-
-<!-- Grid -->
-<div class="grid-wrap">
-  <div class="sections-grid" id="sections-grid"></div>
+<!-- Stats strip -->
+<div class="stats-strip">
+  <div class="stats-inner">
+    <div class="stat-item">
+      <div class="stat-value">32</div>
+      <div class="stat-label">Diagnostic sections</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">0</div>
+      <div class="stat-label">Dependencies to install</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">PG14+</div>
+      <div class="stat-label">PostgreSQL compatible</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">MIT</div>
+      <div class="stat-label">Open source license</div>
+    </div>
+  </div>
 </div>
+
+<!-- Coverage -->
+<section class="section alt">
+  <div class="section-inner">
+    <div class="section-label">Coverage</div>
+    <h2 class="section-heading">Every bottleneck, one place.</h2>
+    <p class="section-sub">8 diagnostic areas, 32 sections, each with a clear threshold and action step so you always know what to do next.</p>
+    <div class="coverage-grid">
+      <div class="cov-card">
+        <div class="cov-icon">⚡</div>
+        <div class="cov-sections">Sections 01–05</div>
+        <div class="cov-title">Query Behavior</div>
+        <div class="cov-desc">Slow queries, temp file spill, sequential scan storms, N+1 patterns, JIT overhead</div>
+      </div>
+      <div class="cov-card">
+        <div class="cov-icon">🗂</div>
+        <div class="cov-sections">Sections 06–10</div>
+        <div class="cov-title">Index Health</div>
+        <div class="cov-desc">Unused, duplicate, invalid, and missing FK indexes — plus index bloat estimation</div>
+      </div>
+      <div class="cov-card">
+        <div class="cov-icon">🗄</div>
+        <div class="cov-sections">Sections 11–14</div>
+        <div class="cov-title">Tables & Storage</div>
+        <div class="cov-desc">Table and TOAST bloat, size rankings, heap vs index access patterns</div>
+      </div>
+      <div class="cov-card">
+        <div class="cov-icon">🧹</div>
+        <div class="cov-sections">Sections 15–18</div>
+        <div class="cov-title">Vacuum & Statistics</div>
+        <div class="cov-desc">Autovacuum progress, dead tuple backlog, stale stats, long-running transactions blocking vacuum</div>
+      </div>
+      <div class="cov-card">
+        <div class="cov-icon">🔗</div>
+        <div class="cov-sections">Sections 19–22</div>
+        <div class="cov-title">Connections & Locks</div>
+        <div class="cov-desc">Connection saturation, idle-in-transaction, full lock wait trees, wait event breakdown</div>
+      </div>
+      <div class="cov-card">
+        <div class="cov-icon">🔄</div>
+        <div class="cov-sections">Sections 23–25</div>
+        <div class="cov-title">Replication</div>
+        <div class="cov-desc">Streaming lag per standby, logical slot consumer lag, WAL retention by all slots</div>
+      </div>
+      <div class="cov-card">
+        <div class="cov-icon">⚠️</div>
+        <div class="cov-sections">Sections 26–28</div>
+        <div class="cov-title">Risk Signals</div>
+        <div class="cov-desc">XID and MultiXact wraparound risk, sequence exhaustion — the silent killers</div>
+      </div>
+      <div class="cov-card">
+        <div class="cov-icon">⚙️</div>
+        <div class="cov-sections">Sections 29–32</div>
+        <div class="cov-title">Config & Health</div>
+        <div class="cov-desc">Key GUC settings review, buffer cache hit ratio, checkpoint pressure, DB summary</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How to use -->
+<section class="section">
+  <div class="section-inner">
+    <div class="section-label">Usage</div>
+    <h2 class="section-heading">Three ways to use pgvitals.</h2>
+    <p class="section-sub">Pick the workflow that fits your situation — a production incident, a routine health check, or a planned load test.</p>
+    <div class="steps-grid">
+      <div class="step-card">
+        <div class="step-num">1</div>
+        <div class="step-title">Ad-hoc investigation</div>
+        <div class="step-desc">Browse to the area matching your symptom — slow queries, locks, bloat. Open the section, read the threshold, run the SQL.</div>
+        <div class="step-code">psql -d mydb -f sql/21_lock_wait_tree.sql</div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">2</div>
+        <div class="step-title">Full diagnostic sweep</div>
+        <div class="step-desc">Run all 32 sections in sequence before a release or after a migration. The master.sql file combines everything.</div>
+        <div class="step-code">psql -d mydb -f master.sql</div>
+      </div>
+      <div class="step-card">
+        <div class="step-num">3</div>
+        <div class="step-title">Load test monitoring</div>
+        <div class="step-desc">Use the snapshot framework to capture metrics at intervals during a stress test, then diff baseline vs peak.</div>
+        <div class="step-code">SELECT perf_monitor<br>&nbsp;&nbsp;.capture_snapshot('peak');</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Load test monitoring -->
+<section class="section alt">
+  <div class="section-inner">
+    <div class="monitoring-split">
+      <div>
+        <div class="section-label">Load Testing</div>
+        <h2 class="section-heading">Built-in snapshot framework.</h2>
+        <p class="section-sub" style="margin-bottom:0">Capture a point-in-time snapshot of all metrics with one function call. Compare baseline vs peak. Find what changed.</p>
+        <div class="monitoring-steps">
+          <div class="mon-step">
+            <div class="mon-step-badge">1</div>
+            <div>
+              <div class="mon-step-title">Set up once</div>
+              <div class="mon-step-desc">Run <code>schema.sql</code> and <code>capture_snapshot.sql</code> to create the monitoring schema and function.</div>
+            </div>
+          </div>
+          <div class="mon-step">
+            <div class="mon-step-badge">2</div>
+            <div>
+              <div class="mon-step-title">Capture labelled snapshots</div>
+              <div class="mon-step-desc">Call <code>capture_snapshot('baseline')</code> before the test, <code>'peak'</code> at max load, <code>'cooldown'</code> after.</div>
+            </div>
+          </div>
+          <div class="mon-step">
+            <div class="mon-step-badge">3</div>
+            <div>
+              <div class="mon-step-title">Analyse the delta</div>
+              <div class="mon-step-desc">Run <code>trend_queries.sql</code> to see connection growth, lock wait spikes, dead tuple accumulation, cache hit ratio trends.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="monitoring-terminal">
+        <div class="terminal-bar">
+          <div class="dot dot-red"></div>
+          <div class="dot dot-yellow"></div>
+          <div class="dot dot-green"></div>
+          <span class="terminal-title">psql — mydb</span>
+        </div>
+        <div class="terminal-body">
+          <div><span class="t-comment">-- setup (run once)</span></div>
+          <div><span class="t-prompt">mydb=#</span> <span class="t-cmd">\i monitoring/schema.sql</span></div>
+          <div><span class="t-prompt">mydb=#</span> <span class="t-cmd">\i monitoring/capture_snapshot.sql</span></div>
+          <div>&nbsp;</div>
+          <div><span class="t-comment">-- before load test</span></div>
+          <div><span class="t-prompt">mydb=#</span> <span class="t-cmd">SELECT perf_monitor</span></div>
+          <div><span class="t-cmd">&nbsp;&nbsp;.capture_snapshot(<span class="t-hi">'baseline'</span>);</span></div>
+          <div><span class="t-out">&nbsp;capture_snapshot</span></div>
+          <div><span class="t-out">─────────────────</span></div>
+          <div><span class="t-out">&nbsp;1</span></div>
+          <div>&nbsp;</div>
+          <div><span class="t-comment">-- at peak load</span></div>
+          <div><span class="t-prompt">mydb=#</span> <span class="t-cmd">SELECT perf_monitor</span></div>
+          <div><span class="t-cmd">&nbsp;&nbsp;.capture_snapshot(<span class="t-hi">'peak'</span>);</span></div>
+          <div><span class="t-out">&nbsp;capture_snapshot</span></div>
+          <div><span class="t-out">─────────────────</span></div>
+          <div><span class="t-out">&nbsp;2</span></div>
+          <div>&nbsp;</div>
+          <div><span class="t-comment">-- analyse trends</span></div>
+          <div><span class="t-prompt">mydb=#</span> <span class="t-cmd">\i monitoring/trend_queries.sql</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="section dark">
+  <div class="section-inner">
+    <div class="cta-inner">
+      <div class="section-label light">Get started</div>
+      <h2 class="section-heading light">Your database is telling you something.</h2>
+      <p class="section-sub light">32 sections. Every bottleneck covered. Copy, paste, act.</p>
+      <div class="cta-actions">
+        <a class="btn-cta-primary" href="/diagnostics.html">Open Diagnostics →</a>
+        <a class="btn-cta-ghost" href="https://github.com/pgvitals/pgvitals" target="_blank" rel="noopener">
+          <svg height="15" viewBox="0 0 16 16" width="15" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+          Star on GitHub
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
 
 <!-- Footer -->
 <footer>
-  <p>
-    <strong>pgvitals</strong> — MIT License ·
-    <a href="https://github.com/pgvitals/pgvitals" target="_blank">GitHub</a> ·
-    <a href="https://github.com/pgvitals/pgvitals/blob/master/master.sql" target="_blank">Download master.sql</a>
-  </p>
+  <div class="footer-inner">
+    <span>🩺 <strong>pgvitals</strong> — MIT License</span>
+    <span>
+      <a href="/diagnostics.html">Diagnostics</a> ·
+      <a href="https://github.com/pgvitals/pgvitals" target="_blank">GitHub</a> ·
+      <a href="https://github.com/pgvitals/pgvitals/blob/master/master.sql" target="_blank">Download master.sql</a>
+    </span>
+  </div>
 </footer>
 
-<script src="sections.js"></script>
-<script>
-  // ── Area config ────────────────────────────────────────
-  const AREAS = [
-    { slug: 'query',       label: 'Query Behavior',  color: '#58a6ff' },
-    { slug: 'index',       label: 'Index Health',    color: '#3fb950' },
-    { slug: 'table',       label: 'Tables & Storage',color: '#f0883e' },
-    { slug: 'vacuum',      label: 'Vacuum & Stats',  color: '#bc8cff' },
-    { slug: 'connections', label: 'Connections & Locks', color: '#ffa657' },
-    { slug: 'replication', label: 'Replication',     color: '#79c0ff' },
-    { slug: 'risk',        label: 'Risk Signals',    color: '#f85149' },
-    { slug: 'config',      label: 'Config & Health', color: '#848d97' },
-  ];
-
-  let activeArea = 'all';
-  let searchQuery = '';
-
-  // ── Expand / collapse all SQL ──────────────────────────
-  let allExpanded = false;
-
-  function toggleAll() {
-    allExpanded = !allExpanded;
-    document.querySelectorAll('.sql-wrap').forEach(w => {
-      w.classList.toggle('open', allExpanded);
-    });
-    document.getElementById('btn-expand-all').textContent =
-      allExpanded ? '⊖ Collapse SQL' : '⊕ Expand SQL';
-  }
-
-  // ── Filters ────────────────────────────────────────────
-  function renderFilters() {
-    const wrap = document.getElementById('filters');
-    const total = SECTIONS.length;
-
-    const allChip = document.createElement('button');
-    allChip.className = 'filter-chip' + (activeArea === 'all' ? ' active' : '');
-    allChip.style.cssText = activeArea === 'all' ? 'background:#58a6ff;color:#fff;border-color:transparent' : '';
-    allChip.innerHTML = `All <span class="chip-count">${total}</span>`;
-    allChip.onclick = () => { activeArea = 'all'; renderAll(); };
-    wrap.appendChild(allChip);
-
-    AREAS.forEach(area => {
-      const count = SECTIONS.filter(s => s.areaSlug === area.slug).length;
-      const chip = document.createElement('button');
-      const isActive = activeArea === area.slug;
-      chip.className = 'filter-chip' + (isActive ? ' active' : '');
-      chip.style.cssText = isActive ? `background:${area.color};color:#fff;border-color:transparent` : '';
-      chip.innerHTML = `${area.label} <span class="chip-count">${count}</span>`;
-      chip.onclick = () => { activeArea = area.slug; renderAll(); };
-      wrap.appendChild(chip);
-    });
-
-    const expandBtn = document.createElement('button');
-    expandBtn.id = 'btn-expand-all';
-    expandBtn.className = 'btn-expand-all';
-    expandBtn.textContent = allExpanded ? '⊖ Collapse all' : '⊕ Expand all';
-    expandBtn.onclick = toggleAll;
-    wrap.appendChild(expandBtn);
-  }
-
-  // ── Toggle SQL on a single card ────────────────────────
-  function toggleSQL(toolbar) {
-    toolbar.closest('.sql-wrap').classList.toggle('open');
-  }
-
-  // ── Card rendering ─────────────────────────────────────
-  function renderCard(section) {
-    const area = AREAS.find(a => a.slug === section.areaSlug);
-    const card = document.createElement('div');
-    card.className = 'section-card';
-    card.dataset.area = section.areaSlug;
-
-    const requiresHtml = section.requires
-      ? `<span class="requires-badge">⚡ Requires: ${section.requires}</span>`
-      : '';
-
-    const chevronSvg = `<svg class="chevron" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M4.427 7.427l3.396 3.396a.25.25 0 00.354 0l3.396-3.396A.25.25 0 0011.396 7H4.604a.25.25 0 00-.177.427z"/></svg>`;
-
-    card.innerHTML = `
-      <div class="card-header">
-        <div class="card-meta">
-          <span class="area-badge area-${section.areaSlug}">${area?.label || section.areaSlug}</span>
-          <span class="section-num">#${section.id}</span>
-        </div>
-        <div class="card-title">${section.title}</div>
-      </div>
-      <div class="card-info">
-        <div class="info-row">
-          <span class="info-label">What</span>
-          <span class="info-value">${section.what}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Look for</span>
-          <span class="info-value">${section.lookFor}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Action</span>
-          <span class="info-value">${section.action}</span>
-        </div>
-        ${requiresHtml}
-      </div>
-      <div class="sql-wrap${allExpanded ? ' open' : ''}">
-        <div class="sql-toolbar" onclick="toggleSQL(this)">
-          <span class="sql-label">SQL</span>
-          <div style="display:flex;align-items:center;gap:8px">
-            <button class="copy-btn" onclick="event.stopPropagation();copySQL(this)">
-              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z"></path><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z"></path></svg>
-              Copy
-            </button>
-            ${chevronSvg}
-          </div>
-        </div>
-        <div class="sql-content">
-          <pre class="sql-block"><code class="language-sql">${escapeHtml(section.sql.trim())}</code></pre>
-        </div>
-      </div>
-    `;
-
-    // Highlight
-    const codeEl = card.querySelector('code');
-    hljs.highlightElement(codeEl);
-
-    return card;
-  }
-
-  function escapeHtml(str) {
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-
-  // ── Copy button ────────────────────────────────────────
-  function copySQL(btn) {
-    const code = btn.closest('.sql-wrap').querySelector('.sql-content code');
-    navigator.clipboard.writeText(code.innerText).then(() => {
-      btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path></svg> Copied!`;
-      btn.classList.add('copied');
-      setTimeout(() => {
-        btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z"></path><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z"></path></svg> Copy`;
-        btn.classList.remove('copied');
-      }, 2000);
-    });
-  }
-
-  // ── Filter + Search ────────────────────────────────────
-  function getVisible() {
-    return SECTIONS.filter(s => {
-      const areaMatch = activeArea === 'all' || s.areaSlug === activeArea;
-      const q = searchQuery.toLowerCase();
-      const textMatch = !q ||
-        s.title.toLowerCase().includes(q) ||
-        s.id.includes(q) ||
-        s.what.toLowerCase().includes(q) ||
-        s.lookFor.toLowerCase().includes(q) ||
-        s.action.toLowerCase().includes(q) ||
-        s.sql.toLowerCase().includes(q) ||
-        (s.requires || '').toLowerCase().includes(q);
-      return areaMatch && textMatch;
-    });
-  }
-
-  function renderAll() {
-    // Filters
-    document.getElementById('filters').innerHTML = '';
-    renderFilters();
-
-    // Grid
-    const grid = document.getElementById('sections-grid');
-    grid.innerHTML = '';
-    const visible = getVisible();
-
-    document.getElementById('result-count').textContent =
-      visible.length === SECTIONS.length ? '' : `${visible.length} of ${SECTIONS.length}`;
-
-    if (visible.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'empty-state';
-      empty.innerHTML = `<div class="empty-icon">🔍</div><h3>No sections match</h3><p>Try a different search term or clear the filter.</p>`;
-      grid.appendChild(empty);
-      return;
-    }
-
-    visible.forEach(s => grid.appendChild(renderCard(s)));
-  }
-
-  // ── Search input ───────────────────────────────────────
-  document.getElementById('search-input').addEventListener('input', e => {
-    searchQuery = e.target.value;
-    // Auto-expand all when searching so results are immediately visible
-    if (searchQuery) allExpanded = true;
-    renderAll();
-  });
-
-  // ── Init ───────────────────────────────────────────────
-  renderAll();
-</script>
 </body>
 </html>

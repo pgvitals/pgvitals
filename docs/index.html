@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>pgvitals — PostgreSQL Performance Diagnostics</title>
+  <meta name="description" content="32 copy-paste PostgreSQL diagnostic queries covering every performance bottleneck. No extensions. No installation. Just SQL." />
+  <meta property="og:title" content="pgvitals — PostgreSQL Performance Diagnostics" />
+  <meta property="og:description" content="32 copy-paste SQL queries for every PostgreSQL bottleneck: slow queries, bloat, locks, replication lag, wraparound risk and more." />
+  <meta property="og:type" content="website" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --surface2:  #1c2128;
+      --border:    #21262d;
+      --border2:   #30363d;
+      --text:      #e6edf3;
+      --text2:     #8b949e;
+      --text3:     #6e7681;
+      --blue:      #58a6ff;
+      --green:     #3fb950;
+      --orange:    #f0883e;
+      --purple:    #bc8cff;
+      --amber:     #ffa657;
+      --cyan:      #79c0ff;
+      --red:       #f85149;
+      --gray:      #848d97;
+      --radius:    8px;
+      --radius-lg: 12px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ── Header ─────────────────────────────────────────── */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(13, 17, 23, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+    }
+
+    .header-inner {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      height: 60px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      flex-shrink: 0;
+    }
+
+    .logo-icon {
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .logo-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.3px;
+    }
+
+    .logo-name span { color: var(--blue); }
+
+    .header-search {
+      flex: 1;
+      max-width: 480px;
+      position: relative;
+    }
+
+    .header-search input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: 14px;
+      padding: 7px 14px 7px 36px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .header-search input:focus { border-color: var(--blue); }
+    .header-search input::placeholder { color: var(--text3); }
+
+    .search-icon {
+      position: absolute;
+      left: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text3);
+      font-size: 15px;
+      pointer-events: none;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+
+    .btn-github {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 500;
+      padding: 6px 14px;
+      text-decoration: none;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .btn-github:hover { border-color: var(--blue); background: var(--surface2); }
+
+    .result-count {
+      font-size: 13px;
+      color: var(--text3);
+      flex-shrink: 0;
+    }
+
+    /* ── Hero ───────────────────────────────────────────── */
+    .hero {
+      text-align: center;
+      padding: 56px 24px 40px;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    .hero h1 {
+      font-size: clamp(28px, 5vw, 42px);
+      font-weight: 800;
+      letter-spacing: -1px;
+      line-height: 1.2;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, var(--text) 0%, var(--blue) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero p {
+      font-size: 17px;
+      color: var(--text2);
+      max-width: 540px;
+      margin: 0 auto 28px;
+      line-height: 1.7;
+    }
+
+    .hero-badges {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text2);
+      padding: 4px 12px;
+    }
+
+    .badge .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+    }
+
+    /* ── Filters ────────────────────────────────────────── */
+    .filters-wrap {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 24px 20px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .filter-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border2);
+      background: var(--surface);
+      color: var(--text2);
+      transition: all 0.15s;
+      user-select: none;
+    }
+
+    .filter-chip:hover { border-color: var(--blue); color: var(--text); }
+
+    .filter-chip.active {
+      color: #fff;
+      border-color: transparent;
+    }
+
+    .filter-chip .chip-count {
+      background: rgba(255,255,255,0.15);
+      border-radius: 10px;
+      padding: 1px 7px;
+      font-size: 11px;
+    }
+
+    /* ── Grid ───────────────────────────────────────────── */
+    .grid-wrap {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 24px 60px;
+    }
+
+    .sections-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(540px, 1fr));
+      gap: 16px;
+    }
+
+    /* ── Section Card ───────────────────────────────────── */
+    .section-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      transition: border-color 0.15s, transform 0.15s;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .section-card:hover {
+      border-color: var(--border2);
+      transform: translateY(-1px);
+    }
+
+    .card-header {
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .card-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .area-badge {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .section-num {
+      font-size: 12px;
+      color: var(--text3);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.2px;
+    }
+
+    /* ── Info rows ──────────────────────────────────────── */
+    .card-info {
+      padding: 12px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+    }
+
+    .info-row {
+      display: grid;
+      grid-template-columns: 78px 1fr;
+      gap: 8px;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .info-label {
+      font-weight: 600;
+      color: var(--text3);
+      font-size: 11px;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      padding-top: 2px;
+    }
+
+    .info-value { color: var(--text2); }
+
+    .info-value code {
+      background: var(--border);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 12px;
+      color: var(--orange);
+    }
+
+    .requires-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      background: rgba(88, 166, 255, 0.1);
+      border: 1px solid rgba(88, 166, 255, 0.2);
+      color: var(--blue);
+      padding: 1px 8px;
+      border-radius: 4px;
+      margin-top: 2px;
+    }
+
+    /* ── SQL Block ──────────────────────────────────────── */
+    .sql-wrap {
+      flex: 1;
+      position: relative;
+    }
+
+    .sql-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+    }
+
+    .sql-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text3);
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+    }
+
+    .copy-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 5px;
+      color: var(--text2);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .copy-btn:hover { border-color: var(--blue); color: var(--blue); }
+    .copy-btn.copied { border-color: var(--green); color: var(--green); }
+
+    .sql-block {
+      margin: 0;
+      overflow-x: auto;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+
+    .sql-block code.hljs {
+      padding: 16px 20px;
+      font-size: 12.5px;
+      line-height: 1.7;
+      background: transparent !important;
+    }
+
+    /* custom scrollbar */
+    .sql-block::-webkit-scrollbar { width: 6px; height: 6px; }
+    .sql-block::-webkit-scrollbar-track { background: transparent; }
+    .sql-block::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+    /* override hljs background */
+    .hljs { background: var(--surface2) !important; }
+
+    /* ── Empty state ────────────────────────────────────── */
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 80px 20px;
+      color: var(--text3);
+    }
+
+    .empty-state .empty-icon { font-size: 48px; margin-bottom: 16px; }
+    .empty-state h3 { font-size: 18px; color: var(--text2); margin-bottom: 8px; }
+
+    /* ── Footer ─────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 24px;
+      text-align: center;
+      color: var(--text3);
+      font-size: 13px;
+    }
+
+    footer a { color: var(--blue); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    /* ── Area colors ─────────────────────────────────────── */
+    .area-query      { background: rgba(88,166,255,0.12); color: #58a6ff; }
+    .area-index      { background: rgba(63,185,80,0.12);  color: #3fb950; }
+    .area-table      { background: rgba(240,136,62,0.12); color: #f0883e; }
+    .area-vacuum     { background: rgba(188,140,255,0.12);color: #bc8cff; }
+    .area-connections{ background: rgba(255,166,87,0.12); color: #ffa657; }
+    .area-replication{ background: rgba(121,192,255,0.12);color: #79c0ff; }
+    .area-risk       { background: rgba(248,81,73,0.12);  color: #f85149; }
+    .area-config     { background: rgba(132,141,151,0.12);color: #848d97; }
+
+    .chip-query      { background: #58a6ff; }
+    .chip-index      { background: #3fb950; }
+    .chip-table      { background: #f0883e; }
+    .chip-vacuum     { background: #bc8cff; }
+    .chip-connections{ background: #ffa657; }
+    .chip-replication{ background: #79c0ff; }
+    .chip-risk       { background: #f85149; }
+    .chip-config     { background: #848d97; }
+
+    /* ── Responsive ─────────────────────────────────────── */
+    @media (max-width: 700px) {
+      .sections-grid { grid-template-columns: 1fr; }
+      .logo-name { display: none; }
+      .hero h1 { font-size: 26px; }
+      .hero p { font-size: 15px; }
+      .btn-github span { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="header-inner">
+    <a class="logo" href="#">
+      <span class="logo-icon">🩺</span>
+      <span class="logo-name">pg<span>vitals</span></span>
+    </a>
+    <div class="header-search">
+      <span class="search-icon">⌕</span>
+      <input type="text" id="search-input" placeholder="Search sections, SQL, keywords…" autocomplete="off" />
+    </div>
+    <span class="result-count" id="result-count"></span>
+    <div class="header-actions">
+      <a class="btn-github" href="https://github.com/pgvitals/pgvitals" target="_blank" rel="noopener">
+        <svg height="16" viewBox="0 0 16 16" width="16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+  </div>
+</header>
+
+<!-- Hero -->
+<section class="hero">
+  <h1>PostgreSQL Performance Diagnostics</h1>
+  <p>32 copy-paste SQL queries that cover every performance bottleneck. Run during an incident, before a release, or wire into a load test.</p>
+  <div class="hero-badges">
+    <span class="badge"><span class="dot"></span> 32 sections</span>
+    <span class="badge">PostgreSQL 14+</span>
+    <span class="badge">Zero dependencies</span>
+    <span class="badge">MIT License</span>
+  </div>
+</section>
+
+<!-- Filters -->
+<div class="filters-wrap" id="filters"></div>
+
+<!-- Grid -->
+<div class="grid-wrap">
+  <div class="sections-grid" id="sections-grid"></div>
+</div>
+
+<!-- Footer -->
+<footer>
+  <p>
+    <strong>pgvitals</strong> — MIT License ·
+    <a href="https://github.com/pgvitals/pgvitals" target="_blank">GitHub</a> ·
+    <a href="https://github.com/pgvitals/pgvitals/blob/master/master.sql" target="_blank">Download master.sql</a>
+  </p>
+</footer>
+
+<script src="sections.js"></script>
+<script>
+  // ── Area config ────────────────────────────────────────
+  const AREAS = [
+    { slug: 'query',       label: 'Query Behavior',  color: '#58a6ff' },
+    { slug: 'index',       label: 'Index Health',    color: '#3fb950' },
+    { slug: 'table',       label: 'Tables & Storage',color: '#f0883e' },
+    { slug: 'vacuum',      label: 'Vacuum & Stats',  color: '#bc8cff' },
+    { slug: 'connections', label: 'Connections & Locks', color: '#ffa657' },
+    { slug: 'replication', label: 'Replication',     color: '#79c0ff' },
+    { slug: 'risk',        label: 'Risk Signals',    color: '#f85149' },
+    { slug: 'config',      label: 'Config & Health', color: '#848d97' },
+  ];
+
+  let activeArea = 'all';
+  let searchQuery = '';
+
+  // ── Filters ────────────────────────────────────────────
+  function renderFilters() {
+    const wrap = document.getElementById('filters');
+    const total = SECTIONS.length;
+
+    const allChip = document.createElement('button');
+    allChip.className = 'filter-chip' + (activeArea === 'all' ? ' active' : '');
+    allChip.style.cssText = activeArea === 'all' ? 'background:#58a6ff;color:#fff;border-color:transparent' : '';
+    allChip.innerHTML = `All <span class="chip-count">${total}</span>`;
+    allChip.onclick = () => { activeArea = 'all'; renderAll(); };
+    wrap.appendChild(allChip);
+
+    AREAS.forEach(area => {
+      const count = SECTIONS.filter(s => s.areaSlug === area.slug).length;
+      const chip = document.createElement('button');
+      const isActive = activeArea === area.slug;
+      chip.className = 'filter-chip' + (isActive ? ' active' : '');
+      chip.style.cssText = isActive ? `background:${area.color};color:#fff;border-color:transparent` : '';
+      chip.innerHTML = `${area.label} <span class="chip-count">${count}</span>`;
+      chip.onclick = () => { activeArea = area.slug; renderAll(); };
+      wrap.appendChild(chip);
+    });
+  }
+
+  // ── Card rendering ─────────────────────────────────────
+  function renderCard(section) {
+    const area = AREAS.find(a => a.slug === section.areaSlug);
+    const card = document.createElement('div');
+    card.className = 'section-card';
+    card.dataset.area = section.areaSlug;
+
+    const requiresHtml = section.requires
+      ? `<span class="requires-badge">⚡ Requires: ${section.requires}</span>`
+      : '';
+
+    card.innerHTML = `
+      <div class="card-header">
+        <div class="card-meta">
+          <span class="area-badge area-${section.areaSlug}">${area?.label || section.areaSlug}</span>
+          <span class="section-num">#${section.id}</span>
+        </div>
+        <div class="card-title">${section.title}</div>
+      </div>
+      <div class="card-info">
+        <div class="info-row">
+          <span class="info-label">What</span>
+          <span class="info-value">${section.what}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Look for</span>
+          <span class="info-value">${section.lookFor}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Action</span>
+          <span class="info-value">${section.action}</span>
+        </div>
+        ${requiresHtml}
+      </div>
+      <div class="sql-wrap">
+        <div class="sql-toolbar">
+          <span class="sql-label">SQL</span>
+          <button class="copy-btn" onclick="copySQL(this)">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z"></path><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z"></path></svg>
+            Copy
+          </button>
+        </div>
+        <pre class="sql-block"><code class="language-sql">${escapeHtml(section.sql.trim())}</code></pre>
+      </div>
+    `;
+
+    // Highlight
+    const codeEl = card.querySelector('code');
+    hljs.highlightElement(codeEl);
+
+    return card;
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── Copy button ────────────────────────────────────────
+  function copySQL(btn) {
+    const code = btn.closest('.sql-wrap').querySelector('code');
+    navigator.clipboard.writeText(code.innerText).then(() => {
+      btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path></svg> Copied!`;
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z"></path><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z"></path></svg> Copy`;
+        btn.classList.remove('copied');
+      }, 2000);
+    });
+  }
+
+  // ── Filter + Search ────────────────────────────────────
+  function getVisible() {
+    return SECTIONS.filter(s => {
+      const areaMatch = activeArea === 'all' || s.areaSlug === activeArea;
+      const q = searchQuery.toLowerCase();
+      const textMatch = !q ||
+        s.title.toLowerCase().includes(q) ||
+        s.id.includes(q) ||
+        s.what.toLowerCase().includes(q) ||
+        s.lookFor.toLowerCase().includes(q) ||
+        s.action.toLowerCase().includes(q) ||
+        s.sql.toLowerCase().includes(q) ||
+        (s.requires || '').toLowerCase().includes(q);
+      return areaMatch && textMatch;
+    });
+  }
+
+  function renderAll() {
+    // Filters
+    document.getElementById('filters').innerHTML = '';
+    renderFilters();
+
+    // Grid
+    const grid = document.getElementById('sections-grid');
+    grid.innerHTML = '';
+    const visible = getVisible();
+
+    document.getElementById('result-count').textContent =
+      visible.length === SECTIONS.length ? '' : `${visible.length} of ${SECTIONS.length}`;
+
+    if (visible.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty-state';
+      empty.innerHTML = `<div class="empty-icon">🔍</div><h3>No sections match</h3><p>Try a different search term or clear the filter.</p>`;
+      grid.appendChild(empty);
+      return;
+    }
+
+    visible.forEach(s => grid.appendChild(renderCard(s)));
+  }
+
+  // ── Search input ───────────────────────────────────────
+  document.getElementById('search-input').addEventListener('input', e => {
+    searchQuery = e.target.value;
+    renderAll();
+  });
+
+  // ── Init ───────────────────────────────────────────────
+  renderAll();
+</script>
+</body>
+</html>

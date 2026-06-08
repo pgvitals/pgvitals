@@ -17,15 +17,15 @@ jobs:
         run: |
           FAILED=0
           for f in sql/[0-9]*.sql; do
-            if ! grep -q "-- What" "$f"; then
+            if ! grep -q -e "-- What" "$f"; then
               echo "MISSING header in $f"
               FAILED=1
             fi
-            if ! grep -q "-- Look for" "$f"; then
+            if ! grep -q -e "-- Look for" "$f"; then
               echo "MISSING 'Look for' in $f"
               FAILED=1
             fi
-            if ! grep -q "-- Action" "$f"; then
+            if ! grep -q -e "-- Action" "$f"; then
               echo "MISSING 'Action' in $f"
               FAILED=1
             fi

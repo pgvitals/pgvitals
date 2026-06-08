@@ -16,8 +16,8 @@ SELECT
         checkpoints_req::numeric
         / nullif(checkpoints_timed + checkpoints_req, 0) * 100, 2
     )                                                                 AS forced_pct,
-    round(checkpoint_write_time / 1000, 2)                           AS write_time_sec,
-    round(checkpoint_sync_time / 1000, 2)                            AS sync_time_sec,
+    round((checkpoint_write_time / 1000)::numeric, 2)                AS write_time_sec,
+    round((checkpoint_sync_time / 1000)::numeric, 2)                 AS sync_time_sec,
     buffers_checkpoint,
     buffers_clean,
     maxwritten_clean,

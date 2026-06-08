@@ -10,7 +10,7 @@
 
 SELECT
     schemaname,
-    tablename,
+    relname AS tablename,
     n_live_tup,
     n_mod_since_analyze,
     round(

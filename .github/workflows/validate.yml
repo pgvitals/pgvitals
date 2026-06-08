@@ -83,7 +83,15 @@ jobs:
         env:
           PGPASSWORD: pgvitals
         run: |
-          # Enable shared_preload_libraries (requires container restart handled by service)
+          psql -h localhost -U postgres -d pgvitals_test \
+            -c "ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements';"
+          docker restart $(docker ps -q --filter ancestor=postgres:16)
+          for i in {1..10}; do
+            if pg_isready -h localhost -U postgres; then
+              break
+            fi
+            sleep 1
+          done
           psql -h localhost -U postgres -d pgvitals_test \
             -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
 

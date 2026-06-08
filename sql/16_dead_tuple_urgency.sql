@@ -9,7 +9,7 @@
 
 SELECT
     schemaname,
-    tablename,
+    relname AS tablename,
     n_dead_tup,
     n_live_tup,
     round(
@@ -21,7 +21,7 @@ SELECT
     last_analyze,
     last_autoanalyze,
     pg_size_pretty(
-        pg_relation_size(schemaname || '.' || tablename)
+        pg_relation_size(relid)
     )                                                                  AS table_size
 FROM pg_stat_user_tables
 WHERE n_dead_tup > 1000

@@ -10,7 +10,7 @@
 -- Per table
 SELECT
     schemaname,
-    tablename,
+    relname AS tablename,
     heap_blks_read,
     heap_blks_hit,
     round(

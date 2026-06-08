@@ -49,8 +49,8 @@ SELECT
         greatest(0, relpages - ceil(reltuples * row_data_width / bs))::bigint * bs
     )                                                                  AS bloat_size_estimate,
     round(
-        greatest(0, 1 - ceil(reltuples * row_data_width / bs)
-                        / nullif(relpages, 0)) * 100, 2
+        (greatest(0, 1 - ceil(reltuples * row_data_width / bs)
+                        / nullif(relpages, 0)) * 100)::numeric, 2
     )                                                                  AS bloat_pct_estimate
 FROM per_table
 WHERE relpages > 10

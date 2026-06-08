@@ -59,13 +59,13 @@ LIMIT 20;`
     action: 'Add a targeted index on the filtered columns; verify with EXPLAIN.',
     sql: `SELECT
     schemaname,
-    tablename,
+    relname AS tablename,
     seq_scan,
     seq_tup_read,
     idx_scan,
     round(seq_scan::numeric / nullif(seq_scan + idx_scan, 0) * 100, 2)    AS seq_scan_pct,
     n_live_tup,
-    pg_size_pretty(pg_total_relation_size(schemaname || '.' || tablename)) AS total_size
+    pg_size_pretty(pg_total_relation_size(schemaname || '.' || relname)) AS total_size
 FROM pg_stat_user_tables
 WHERE seq_scan > 0
   AND n_live_tup > 10000
@@ -244,7 +244,7 @@ SELECT
     actual_pages,
     estimated_min_pages::int,
     round(
-        (1 - estimated_min_pages / nullif(actual_pages, 0)) * 100, 2
+        ((1 - estimated_min_pages / nullif(actual_pages, 0)) * 100)::numeric, 2
     )                                                                      AS bloat_pct_estimate
 FROM index_info
 WHERE index_bytes > 1024 * 1024
@@ -288,8 +288,8 @@ SELECT
         greatest(0, relpages - ceil(reltuples * row_data_width / bs))::bigint * bs
     )                                                                  AS bloat_size_estimate,
     round(
-        greatest(0, 1 - ceil(reltuples * row_data_width / bs)
-                        / nullif(relpages, 0)) * 100, 2
+        (greatest(0, 1 - ceil(reltuples * row_data_width / bs)
+                        / nullif(relpages, 0)) * 100)::numeric, 2
     )                                                                  AS bloat_pct_estimate
 FROM per_table
 WHERE relpages > 10
@@ -362,7 +362,7 @@ LIMIT 30;`
     action: 'Add index for seq scan tables; run VACUUM ANALYZE for high dead_pct.',
     sql: `SELECT
     schemaname,
-    tablename,
+    relname AS tablename,
     seq_scan,
     seq_tup_read,
     idx_scan,
@@ -419,7 +419,7 @@ WHERE backend_type = 'autovacuum worker';`
     action: 'VACUUM ANALYZE tablename; lower autovacuum_vacuum_scale_factor.',
     sql: `SELECT
     schemaname,
-    tablename,
+    relname AS tablename,
     n_dead_tup,
     n_live_tup,
     round(
@@ -431,7 +431,7 @@ WHERE backend_type = 'autovacuum worker';`
     last_analyze,
     last_autoanalyze,
     pg_size_pretty(
-        pg_relation_size(schemaname || '.' || tablename)
+        pg_relation_size(relid)
     )                                                                  AS table_size
 FROM pg_stat_user_tables
 WHERE n_dead_tup > 1000
@@ -448,7 +448,7 @@ LIMIT 25;`
     action: 'ANALYZE tablename; lower autovacuum_analyze_scale_factor for busy tables.',
     sql: `SELECT
     schemaname,
-    tablename,
+    relname AS tablename,
     n_live_tup,
     n_mod_since_analyze,
     round(
@@ -788,7 +788,7 @@ ORDER BY
     action: 'Increase shared_buffers; investigate seq scan storms evicting hot pages.',
     sql: `-- Per table
 SELECT
-    schemaname, tablename,
+    schemaname, relname AS tablename,
     heap_blks_read, heap_blks_hit,
     round(heap_blks_hit::numeric
         / nullif(heap_blks_read + heap_blks_hit, 0) * 100, 2)        AS hit_ratio_pct,
@@ -824,8 +824,8 @@ WHERE datname NOT IN ('template0','template1');`
         checkpoints_req::numeric
         / nullif(checkpoints_timed + checkpoints_req, 0) * 100, 2
     )                                                                 AS forced_pct,
-    round(checkpoint_write_time / 1000, 2)                           AS write_time_sec,
-    round(checkpoint_sync_time / 1000, 2)                            AS sync_time_sec,
+    round((checkpoint_write_time / 1000)::numeric, 2)                AS write_time_sec,
+    round((checkpoint_sync_time / 1000)::numeric, 2)                 AS sync_time_sec,
     buffers_checkpoint,
     buffers_clean,
     maxwritten_clean,

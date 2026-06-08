@@ -418,13 +418,13 @@ LIMIT 20;
 
 SELECT
     schemaname,
-    tablename,
+    relname AS tablename,
     seq_scan,
     seq_tup_read,
     idx_scan,
     round(seq_scan::numeric / nullif(seq_scan + idx_scan, 0) * 100, 2)    AS seq_scan_pct,
     n_live_tup,
-    pg_size_pretty(pg_total_relation_size(schemaname || '.' || tablename)) AS total_size
+    pg_size_pretty(pg_total_relation_size(schemaname || '.' || relname)) AS total_size
 FROM pg_stat_user_tables
 WHERE seq_scan > 0
   AND n_live_tup > 10000
@@ -602,7 +602,7 @@ SELECT
     pg_size_pretty(index_bytes)                                            AS index_size,
     actual_pages,
     estimated_min_pages::int,
-    round((1 - estimated_min_pages / nullif(actual_pages, 0)) * 100, 2)  AS bloat_pct_estimate
+    round(((1 - estimated_min_pages / nullif(actual_pages, 0)) * 100)::numeric, 2)  AS bloat_pct_estimate
 FROM index_info
 WHERE index_bytes > 1024 * 1024   -- > 1 MB
   AND actual_pages > estimated_min_pages
@@ -664,7 +664,7 @@ SELECT
         greatest(0, relpages - ceil(reltuples * row_data_width / bs))::bigint * bs
     )                                                                      AS bloat_size_estimate,
     round(
-        greatest(0, 1 - ceil(reltuples * row_data_width / bs) / nullif(relpages, 0)) * 100,
+        (greatest(0, 1 - ceil(reltuples * row_data_width / bs) / nullif(relpages, 0)) * 100)::numeric,
         2
     )                                                                      AS bloat_pct_estimate
 FROM per_table
@@ -732,7 +732,7 @@ LIMIT 30;
 
 SELECT
     schemaname,
-    tablename,
+    relname AS tablename,
     seq_scan,
     seq_tup_read,
     idx_scan,
@@ -779,7 +779,7 @@ FROM pg_stat_progress_vacuum;
 
 SELECT
     schemaname,
-    tablename,
+    relname AS tablename,
     n_dead_tup,
     n_live_tup,
     round(n_dead_tup::numeric / nullif(n_live_tup + n_dead_tup, 0) * 100, 2) AS dead_pct,
@@ -788,7 +788,7 @@ SELECT
     last_autovacuum,
     last_analyze,
     last_autoanalyze,
-    pg_size_pretty(pg_relation_size(schemaname || '.' || tablename))      AS table_size
+    pg_size_pretty(pg_relation_size(relid))      AS table_size
 FROM pg_stat_user_tables
 WHERE n_dead_tup > 1000
 ORDER BY n_dead_tup DESC
@@ -804,7 +804,7 @@ LIMIT 25;
 
 SELECT
     schemaname,
-    tablename,
+    relname AS tablename,
     n_live_tup,
     n_mod_since_analyze,
     round(n_mod_since_analyze::numeric / nullif(n_live_tup, 0) * 100, 2) AS mod_pct,
@@ -1155,7 +1155,7 @@ ORDER BY
 -- Per table
 SELECT
     schemaname,
-    tablename,
+    relname AS tablename,
     heap_blks_read,
     heap_blks_hit,
     round(heap_blks_hit::numeric / nullif(heap_blks_read + heap_blks_hit, 0) * 100, 2) AS hit_ratio_pct,
@@ -1188,8 +1188,8 @@ SELECT
     checkpoints_timed,
     checkpoints_req,
     round(checkpoints_req::numeric / nullif(checkpoints_timed + checkpoints_req, 0) * 100, 2) AS forced_pct,
-    round(checkpoint_write_time / 1000, 2)                                AS write_time_sec,
-    round(checkpoint_sync_time / 1000, 2)                                 AS sync_time_sec,
+    round((checkpoint_write_time / 1000)::numeric, 2)                     AS write_time_sec,
+    round((checkpoint_sync_time / 1000)::numeric, 2)                      AS sync_time_sec,
     buffers_checkpoint,
     buffers_clean,
     maxwritten_clean,

@@ -10,7 +10,7 @@
 
 SELECT
     schemaname,
-    tablename,
+    relname AS tablename,
     seq_scan,
     seq_tup_read,
     idx_scan,

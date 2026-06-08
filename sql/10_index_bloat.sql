@@ -35,7 +35,7 @@ SELECT
     actual_pages,
     estimated_min_pages::int,
     round(
-        (1 - estimated_min_pages / nullif(actual_pages, 0)) * 100, 2
+        ((1 - estimated_min_pages / nullif(actual_pages, 0)) * 100)::numeric, 2
     )                                                                      AS bloat_pct_estimate
 FROM index_info
 WHERE index_bytes > 1024 * 1024   -- only show indexes > 1 MB

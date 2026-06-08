@@ -149,3 +149,15 @@ CREATE TABLE IF NOT EXISTS perf_monitor.checkpoint_stats (
     buffers_backend_fsync  BIGINT,
     maxwritten_clean       BIGINT
 );
+
+-- Indexes for trend query performance
+CREATE INDEX IF NOT EXISTS idx_slow_queries_snap     ON perf_monitor.slow_queries(snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_temp_pressure_snap    ON perf_monitor.temp_pressure(snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_connections_snap      ON perf_monitor.connections(snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_lock_waits_snap       ON perf_monitor.lock_waits(snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_wait_events_snap      ON perf_monitor.wait_events(snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_table_stats_snap      ON perf_monitor.table_stats(snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_db_summary_snap       ON perf_monitor.db_summary(snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_autovacuum_snap        ON perf_monitor.autovacuum_activity(snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_replication_lag_snap   ON perf_monitor.replication_lag(snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_checkpoint_stats_snap  ON perf_monitor.checkpoint_stats(snapshot_id);

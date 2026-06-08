@@ -64,21 +64,25 @@ jobs:
         env:
           POSTGRES_PASSWORD: pgvitals
           POSTGRES_DB: pgvitals_test
+          POSTGRES_INITDB_ARGS: "--data-checksums"
         options: >-
           --health-cmd pg_isready
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+          -e POSTGRES_HOST_AUTH_METHOD=trust
+          --shm-size=256mb
         ports:
           - 5432:5432
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install pg_stat_statements
+      - name: Configure pg_stat_statements
         env:
           PGPASSWORD: pgvitals
         run: |
+          # Enable shared_preload_libraries (requires container restart handled by service)
           psql -h localhost -U postgres -d pgvitals_test \
             -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
 
@@ -88,12 +92,11 @@ jobs:
         run: |
           FAILED=0
           for f in sql/[0-9]*.sql; do
-            # Use EXPLAIN dry-run where possible; fall back to syntax-only parse
             if ! psql -h localhost -U postgres -d pgvitals_test \
-                 --set ON_ERROR_STOP=off \
+                 --set ON_ERROR_STOP=on \
                  -c "\set QUIET on" \
                  -f "$f" > /dev/null 2>&1; then
-              echo "Parse error in $f"
+              echo "::error file=$f::Parse error in $f"
               psql -h localhost -U postgres -d pgvitals_test -f "$f" 2>&1 | tail -5
               FAILED=1
             else
@@ -101,3 +104,22 @@ jobs:
             fi
           done
           if [ $FAILED -ne 0 ]; then exit 1; fi
+
+      - name: Validate monitoring schema
+        env:
+          PGPASSWORD: pgvitals
+        run: |
+          echo "--- Loading monitoring schema ---"
+          psql -h localhost -U postgres -d pgvitals_test \
+            --set ON_ERROR_STOP=on \
+            -f monitoring/schema.sql
+          echo "--- Loading capture_snapshot function ---"
+          psql -h localhost -U postgres -d pgvitals_test \
+            --set ON_ERROR_STOP=on \
+            -f monitoring/capture_snapshot.sql
+          echo "--- Validating trend queries parse ---"
+          psql -h localhost -U postgres -d pgvitals_test \
+            --set ON_ERROR_STOP=on \
+            -c "\set snap_a 1" -c "\set snap_b 2" \
+            -f monitoring/trend_queries.sql > /dev/null 2>&1
+          echo "Monitoring framework: OK"

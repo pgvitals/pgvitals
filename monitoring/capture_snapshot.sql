@@ -32,6 +32,9 @@ BEGIN
 
     -- Slow queries (top 50 by total time)
     INSERT INTO perf_monitor.slow_queries
+        (snapshot_id, captured_at, queryid, calls,
+         total_exec_ms, mean_exec_ms, pct_total_time,
+         temp_blks_written, rows_per_call, query_snippet)
     SELECT
         v_snapshot_id, v_now,
         queryid,
@@ -49,6 +52,8 @@ BEGIN
 
     -- Temp file pressure
     INSERT INTO perf_monitor.temp_pressure
+        (snapshot_id, captured_at, queryid, calls,
+         temp_blks_written, temp_written_mb, mean_exec_ms, query_snippet)
     SELECT
         v_snapshot_id, v_now,
         queryid, calls,
@@ -63,6 +68,9 @@ BEGIN
 
     -- Connections
     INSERT INTO perf_monitor.connections
+        (snapshot_id, captured_at, total, active, idle,
+         idle_in_txn, idle_in_txn_aborted, waiting,
+         max_connections, used_pct)
     SELECT
         v_snapshot_id, v_now,
         count(*),
@@ -79,6 +87,9 @@ BEGIN
 
     -- Lock waits
     INSERT INTO perf_monitor.lock_waits
+        (snapshot_id, captured_at, blocked_pid, blocked_user,
+         blocking_pids, wait_event_type, wait_event,
+         blocked_duration, query_snippet)
     SELECT
         v_snapshot_id, v_now,
         pid,
@@ -93,6 +104,7 @@ BEGIN
 
     -- Wait events
     INSERT INTO perf_monitor.wait_events
+        (snapshot_id, captured_at, wait_event_type, wait_event, session_count)
     SELECT
         v_snapshot_id, v_now,
         wait_event_type,
@@ -105,6 +117,10 @@ BEGIN
 
     -- Table stats
     INSERT INTO perf_monitor.table_stats
+        (snapshot_id, captured_at, schemaname, tablename,
+         seq_scan, seq_tup_read, idx_scan,
+         n_dead_tup, n_live_tup,
+         heap_blks_hit, heap_blks_read, hit_ratio_pct)
     SELECT
         v_snapshot_id, v_now,
         t.schemaname, t.tablename,
@@ -118,6 +134,9 @@ BEGIN
 
     -- DB summary
     INSERT INTO perf_monitor.db_summary
+        (snapshot_id, captured_at, datname, numbackends,
+         xact_commit, xact_rollback, rollback_pct,
+         cache_hit_pct, deadlocks, temp_files, temp_bytes)
     SELECT
         v_snapshot_id, v_now,
         datname, numbackends,
@@ -130,6 +149,8 @@ BEGIN
 
     -- Autovacuum activity
     INSERT INTO perf_monitor.autovacuum_activity
+        (snapshot_id, captured_at, pid, datname, table_name,
+         phase, heap_blks_vacuumed, num_dead_tuples)
     SELECT
         v_snapshot_id, v_now,
         pid, datname, relid::regclass::text,
@@ -138,6 +159,8 @@ BEGIN
 
     -- Replication lag
     INSERT INTO perf_monitor.replication_lag
+        (snapshot_id, captured_at, application_name, client_addr,
+         state, write_lag, flush_lag, replay_lag, sync_state)
     SELECT
         v_snapshot_id, v_now,
         application_name, client_addr,
@@ -146,6 +169,10 @@ BEGIN
 
     -- Checkpoint stats
     INSERT INTO perf_monitor.checkpoint_stats
+        (snapshot_id, captured_at, checkpoints_timed, checkpoints_req,
+         forced_pct, checkpoint_write_time, checkpoint_sync_time,
+         buffers_checkpoint, buffers_clean,
+         buffers_backend, buffers_backend_fsync, maxwritten_clean)
     SELECT
         v_snapshot_id, v_now,
         checkpoints_timed, checkpoints_req,

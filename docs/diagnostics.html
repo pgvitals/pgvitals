@@ -540,6 +540,66 @@
     /* hidden */
     .section-card.hidden { display: none; }
 
+    /* permalinks — offset for sticky nav + toolbar */
+    .section-card { scroll-margin-top: 130px; }
+
+    /* chip count badge */
+    .chip-count {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 16px;
+      padding: 0 5px;
+      background: rgba(255,255,255,.1);
+      border-radius: 8px;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--slate-light);
+      margin-left: 3px;
+    }
+
+    .chip.active .chip-count { background: rgba(255,255,255,.18); }
+
+    /* copy-link icon button in card header */
+    .copy-link-btn {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 5px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      color: var(--slate);
+      cursor: pointer;
+      transition: all 0.12s;
+      opacity: 0;
+    }
+
+    .section-card:hover .copy-link-btn { opacity: 1; }
+    .copy-link-btn:hover { background: rgba(255,255,255,.08); border-color: var(--border-dark); color: var(--slate-light); }
+    .copy-link-btn.copied { color: #86efac; opacity: 1; }
+
+    /* toast notification */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(6px);
+      background: var(--dark-surface2);
+      border: 1px solid rgba(255,255,255,.12);
+      color: var(--slate-lighter);
+      font-size: 13px;
+      font-weight: 500;
+      padding: 10px 20px;
+      border-radius: var(--radius-lg);
+      z-index: 500;
+      opacity: 0;
+      transition: opacity 0.15s, transform 0.15s;
+      pointer-events: none;
+    }
+
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
     /* ── Footer ──────────────────────────────────────────── */
     footer {
       border-top: 1px solid var(--border-dark);
@@ -614,7 +674,7 @@
   <div class="toolbar-inner">
     <div class="search-wrap">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      <input id="search" type="text" placeholder="Search sections…" autocomplete="off" spellcheck="false" />
+      <input id="search" type="text" placeholder="Search sections… (Ctrl+K)" autocomplete="off" spellcheck="false" />
     </div>
     <div class="chips">
       <div class="chip active" data-area="all" onclick="filterArea(this)">All</div>
@@ -629,6 +689,10 @@
     </div>
     <div class="toolbar-right">
       <span class="result-count" id="result-count"></span>
+      <a class="btn-expand" href="https://raw.githubusercontent.com/pgvitals/pgvitals/master/master.sql" download="master.sql" target="_blank" rel="noopener" style="text-decoration:none">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        master.sql
+      </a>
       <button class="btn-expand" onclick="toggleAll()">
         <svg id="expand-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
         <span id="expand-label">Expand All SQL</span>
@@ -656,10 +720,13 @@
   </div>
 </footer>
 
+<div class="toast" id="toast"></div>
+
 <script src="sections.js"></script>
 <script>
   let activeArea = 'all';
   let allExpanded = false;
+  let toastTimer = null;
 
   const AREA_LABELS = {
     query: 'Query Behavior',
@@ -672,11 +739,25 @@
     config: 'Config & Health',
   };
 
+  function toSlug(title) {
+    return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
   function buildCards() {
     const grid = document.getElementById('grid');
     grid.innerHTML = '';
     SECTIONS.forEach((s, i) => {
+      const slug = toSlug(s.title);
       const card = document.createElement('div');
+      card.id = slug;
       card.className = `section-card card-${s.areaSlug}`;
       card.dataset.area = s.areaSlug;
       card.dataset.search = `${s.id} ${s.title} ${s.area} ${s.what} ${s.lookFor} ${s.action} ${s.sql}`.toLowerCase();
@@ -692,7 +773,12 @@
               <span class="area-badge-dot"></span>
               ${AREA_LABELS[s.areaSlug] || s.area}
             </span>
-            <span class="section-num">#${String(s.id).padStart(2,'0')}</span>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="section-num">#${String(s.id).padStart(2,'0')}</span>
+              <button class="copy-link-btn" onclick="event.stopPropagation();copyLink('${slug}')" title="Copy link to this section">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              </button>
+            </div>
           </div>
           <div class="card-title">${s.title}</div>
         </div>
@@ -727,17 +813,36 @@
         </div>
       `;
 
-      // set text content to avoid XSS
       card.querySelector(`#sql-${i}`).textContent = s.sql.trim();
       grid.appendChild(card);
     });
 
-    // syntax highlight
     document.querySelectorAll('pre code.language-sql').forEach(el => {
       hljs.highlightElement(el);
     });
 
+    initChipCounts();
     updateCount();
+    navigateToHash();
+  }
+
+  function initChipCounts() {
+    const counts = {};
+    SECTIONS.forEach(s => { counts[s.areaSlug] = (counts[s.areaSlug] || 0) + 1; });
+    document.querySelectorAll('.chip[data-area]:not([data-area="all"])').forEach(chip => {
+      if (chip.querySelector('.chip-count')) return; // already added
+      const n = counts[chip.dataset.area] || 0;
+      const badge = document.createElement('span');
+      badge.className = 'chip-count';
+      badge.textContent = n;
+      chip.appendChild(badge);
+    });
+  }
+
+  function navigateToHash() {
+    if (!location.hash) return;
+    const el = document.getElementById(location.hash.slice(1));
+    if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
   }
 
   function toggleSQL(toggle) {
@@ -763,6 +868,14 @@
     });
   }
 
+  function copyLink(slug) {
+    const url = location.origin + location.pathname + '#' + slug;
+    navigator.clipboard.writeText(url).then(() => {
+      showToast('🔗 Link copied to clipboard');
+    });
+    history.replaceState(null, '', '#' + slug);
+  }
+
   function filterArea(chip) {
     document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
@@ -781,7 +894,6 @@
       if (show) visible++;
     });
 
-    // empty state
     const grid = document.getElementById('grid');
     const existing = grid.querySelector('.empty-state');
     if (existing) existing.remove();
@@ -798,9 +910,28 @@
   function updateCount() {
     const visible = document.querySelectorAll('.section-card:not(.hidden)').length;
     const total = SECTIONS.length;
-    const el = document.getElementById('result-count');
-    el.textContent = visible === total ? `${total} sections` : `${visible} of ${total}`;
+    document.getElementById('result-count').textContent =
+      visible === total ? `${total} sections` : `${visible} of ${total}`;
   }
+
+  // Ctrl+K / Cmd+K to focus search
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      const s = document.getElementById('search');
+      s.focus();
+      s.select();
+    }
+  });
+
+  // Escape to clear search
+  document.getElementById('search').addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      e.target.value = '';
+      applyFilters();
+      e.target.blur();
+    }
+  });
 
   document.getElementById('search').addEventListener('input', applyFilters);
 

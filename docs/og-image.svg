@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <radialGradient id="glow" cx="65%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#2563eb" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="dots" x="0" y="0" width="30" height="30" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="1" fill="rgba(255,255,255,0.05)"/>
+    </pattern>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#0f172a"/>
+  <rect width="1200" height="630" fill="url(#dots)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <!-- Logo mark -->
+  <text x="72" y="108" font-family="Georgia, serif" font-size="48" font-weight="bold" fill="#ffffff">🩺</text>
+
+  <!-- Wordmark -->
+  <text x="130" y="108" font-family="Georgia, serif" font-size="48" font-weight="800" fill="#ffffff" letter-spacing="-1">pg</text>
+  <text x="178" y="108" font-family="Georgia, serif" font-size="48" font-weight="800" fill="#93c5fd" letter-spacing="-1">vitals</text>
+
+  <!-- Tag line -->
+  <text x="72" y="154" font-family="system-ui, sans-serif" font-size="16" font-weight="600" fill="#475569" letter-spacing="1.5" text-transform="uppercase">POSTGRESQL PERFORMANCE DIAGNOSTICS</text>
+
+  <!-- Headline -->
+  <text x="72" y="242" font-family="Georgia, serif" font-size="62" font-weight="800" fill="#ffffff" letter-spacing="-2">Stop Guessing.</text>
+  <text x="72" y="318" font-family="Georgia, serif" font-size="62" font-weight="800" fill="#93c5fd" letter-spacing="-2">Start Diagnosing.</text>
+
+  <!-- Description -->
+  <text x="72" y="382" font-family="system-ui, sans-serif" font-size="22" fill="#94a3b8" letter-spacing="-0.3">32 copy-paste SQL queries. Every PostgreSQL bottleneck.</text>
+  <text x="72" y="412" font-family="system-ui, sans-serif" font-size="22" fill="#94a3b8" letter-spacing="-0.3">No install. No agents. Just SQL.</text>
+
+  <!-- Stats pills -->
+  <rect x="72" y="456" width="148" height="40" rx="8" fill="rgba(37,99,235,0.2)" stroke="rgba(147,197,253,0.25)" stroke-width="1"/>
+  <text x="146" y="482" font-family="system-ui, sans-serif" font-size="15" font-weight="700" fill="#93c5fd" text-anchor="middle">32 Sections</text>
+
+  <rect x="232" y="456" width="148" height="40" rx="8" fill="rgba(37,99,235,0.2)" stroke="rgba(147,197,253,0.25)" stroke-width="1"/>
+  <text x="306" y="482" font-family="system-ui, sans-serif" font-size="15" font-weight="700" fill="#93c5fd" text-anchor="middle">0 Dependencies</text>
+
+  <rect x="392" y="456" width="128" height="40" rx="8" fill="rgba(37,99,235,0.2)" stroke="rgba(147,197,253,0.25)" stroke-width="1"/>
+  <text x="456" y="482" font-family="system-ui, sans-serif" font-size="15" font-weight="700" fill="#93c5fd" text-anchor="middle">PostgreSQL 14+</text>
+
+  <rect x="532" y="456" width="88" height="40" rx="8" fill="rgba(37,99,235,0.2)" stroke="rgba(147,197,253,0.25)" stroke-width="1"/>
+  <text x="576" y="482" font-family="system-ui, sans-serif" font-size="15" font-weight="700" fill="#93c5fd" text-anchor="middle">MIT</text>
+
+  <!-- Mock card on right -->
+  <rect x="720" y="80" width="416" height="472" rx="14" fill="#1e293b" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+
+  <!-- Card header -->
+  <rect x="720" y="80" width="416" height="72" rx="14" fill="#273349"/>
+  <rect x="720" y="124" width="416" height="28" fill="#273349"/>
+
+  <rect x="744" y="100" width="110" height="20" rx="4" fill="rgba(59,130,246,0.2)"/>
+  <text x="799" y="115" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#93c5fd" text-anchor="middle">QUERY BEHAVIOR</text>
+  <text x="1116" y="115" font-family="system-ui, sans-serif" font-size="11" fill="#475569" text-anchor="end">#01</text>
+  <text x="744" y="141" font-family="system-ui, sans-serif" font-size="15" font-weight="700" fill="#e2e8f0">Slow / Expensive Queries</text>
+
+  <!-- Card info rows -->
+  <rect x="720" y="152" width="416" height="122" fill="rgba(0,0,0,0.2)"/>
+  <line x1="720" y1="152" x2="1136" y2="152" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+
+  <text x="744" y="174" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#475569">WHAT</text>
+  <text x="820" y="174" font-family="system-ui, sans-serif" font-size="12" fill="#94a3b8">Top queries by total CPU time</text>
+
+  <text x="744" y="202" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#475569">LOOK FOR</text>
+  <text x="820" y="202" font-family="system-ui, sans-serif" font-size="12" fill="#fbbf24">mean_exec_ms > 100</text>
+
+  <text x="744" y="230" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#475569">ACTION</text>
+  <text x="820" y="230" font-family="system-ui, sans-serif" font-size="12" fill="#94a3b8">EXPLAIN ANALYZE top offenders</text>
+
+  <line x1="720" y1="274" x2="1136" y2="274" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+
+  <!-- SQL bar -->
+  <rect x="720" y="274" width="416" height="36" fill="rgba(0,0,0,0.25)"/>
+  <text x="744" y="297" font-family="system-ui, sans-serif" font-size="10" font-weight="700" fill="#475569">SQL</text>
+  <rect x="1080" y="281" width="44" height="22" rx="4" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+  <text x="1102" y="296" font-family="system-ui, sans-serif" font-size="10" fill="#64748b" text-anchor="middle">Copy</text>
+
+  <!-- SQL code block -->
+  <rect x="720" y="310" width="416" height="242" fill="#0d1929"/>
+  <line x1="720" y1="310" x2="1136" y2="310" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+
+  <text x="744" y="338" font-family="monospace" font-size="12" fill="#7dd3fc">SELECT</text>
+  <text x="796" y="338" font-family="monospace" font-size="12" fill="#a78bfa">round</text>
+  <text x="838" y="338" font-family="monospace" font-size="12" fill="#94a3b8">(total_exec_time, 2) AS total_ms,</text>
+  <text x="744" y="360" font-family="monospace" font-size="12" fill="#94a3b8">    calls,</text>
+  <text x="744" y="382" font-family="monospace" font-size="12" fill="#a78bfa">    round</text>
+  <text x="786" y="382" font-family="monospace" font-size="12" fill="#94a3b8">(mean_exec_time, 2) AS mean_ms,</text>
+  <text x="744" y="404" font-family="monospace" font-size="12" fill="#a78bfa">    left</text>
+  <text x="778" y="404" font-family="monospace" font-size="12" fill="#94a3b8">(query, 200) AS query_snippet</text>
+  <text x="744" y="426" font-family="monospace" font-size="12" fill="#7dd3fc">FROM</text>
+  <text x="776" y="426" font-family="monospace" font-size="12" fill="#94a3b8"> pg_stat_statements</text>
+  <text x="744" y="448" font-family="monospace" font-size="12" fill="#7dd3fc">ORDER BY</text>
+  <text x="812" y="448" font-family="monospace" font-size="12" fill="#94a3b8"> total_exec_time</text>
+  <text x="940" y="448" font-family="monospace" font-size="12" fill="#7dd3fc"> DESC</text>
+  <text x="744" y="470" font-family="monospace" font-size="12" fill="#7dd3fc">LIMIT</text>
+  <text x="782" y="470" font-family="monospace" font-size="12" fill="#fcd34d"> 25</text>
+  <text x="798" y="470" font-family="monospace" font-size="12" fill="#94a3b8">;</text>
+
+  <!-- URL -->
+  <text x="72" y="582" font-family="system-ui, sans-serif" font-size="17" fill="#334155" letter-spacing="-0.3">pgvitals.github.io</text>
+</svg>

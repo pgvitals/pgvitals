@@ -600,6 +600,7 @@ ORDER BY sessions DESC;`
     what: 'Per-standby write, flush, and replay lag.',
     lookFor: 'replay_lag > 30s | flush_lag > 10s',
     action: 'Check standby I/O; verify network throughput; review recovery configuration.',
+    requires: 'streaming replication configured',
     sql: `SELECT
     application_name,
     client_addr,
@@ -626,6 +627,7 @@ ORDER BY replay_lag DESC NULLS LAST;`
     what: 'WAL accumulating for logical replication consumers.',
     lookFor: 'consumer_lag_size > 500 MB — risk of disk exhaustion.',
     action: 'Check consumer health; if consumer is gone: SELECT pg_drop_replication_slot(\'name\').',
+    requires: 'logical replication slots configured',
     sql: `SELECT
     slot_name,
     plugin,
@@ -650,6 +652,7 @@ ORDER BY consumer_lag_bytes DESC NULLS LAST;`
     what: 'Total WAL held on disk by ALL slots (streaming + logical).',
     lookFor: 'wal_retained approaching your pg_wal partition free space.',
     action: 'Drop inactive slots; advance or drop lagging slots.',
+    requires: 'replication slots exist',
     sql: `SELECT
     slot_name,
     slot_type,

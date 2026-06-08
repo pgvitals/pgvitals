@@ -10,8 +10,8 @@
 
 SELECT
     s.schemaname,
-    s.tablename,
-    s.indexname,
+    s.relname AS tablename,
+    s.indexrelname AS indexname,
     pg_size_pretty(pg_relation_size(s.indexrelid))          AS index_size,
     s.idx_scan,
     s.idx_tup_read,

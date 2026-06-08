@@ -493,7 +493,7 @@ SELECT
     s.idx_tup_fetch,
     pg_stat_get_last_analyze_time(c.oid)                                  AS last_analyze
 FROM pg_stat_user_indexes s
-JOIN pg_index i USING (indexrelid)
+JOIN pg_index i ON i.indexrelid = s.indexrelid
 JOIN pg_class c ON c.oid = s.indexrelid
 WHERE s.idx_scan = 0
   AND NOT i.indisprimary

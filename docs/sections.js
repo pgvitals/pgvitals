@@ -136,7 +136,7 @@ LIMIT 15;`
     s.idx_tup_read,
     s.idx_tup_fetch
 FROM pg_stat_user_indexes s
-JOIN pg_index i USING (indexrelid)
+JOIN pg_index i ON i.indexrelid = s.indexrelid
 WHERE s.idx_scan = 0
   AND NOT i.indisprimary
   AND NOT i.indisunique

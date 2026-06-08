@@ -864,5 +864,93 @@ FROM pg_stat_bgwriter;`
 FROM pg_stat_database
 WHERE datname NOT IN ('template0','template1')
 ORDER BY numbackends DESC;`
+  },
+  {
+    id: '33',
+    title: 'WAL Generation Rate',
+    area: 'Config & Health',
+    areaSlug: 'config',
+    what: 'WAL (Write-Ahead Log) generation volume and rate since stats reset.',
+    lookFor: 'High wal_mb_per_hour (e.g. > 1000 MB/hr) | high fpi_pct (> 20%)',
+    action: 'Enable wal_compression; tune max_wal_size and checkpoint_timeout.',
+    requires: 'PostgreSQL 14+',
+    sql: `SELECT
+    wal_records,
+    wal_fpi,
+    pg_size_pretty(wal_bytes)                                                 AS total_wal_size,
+    round(wal_bytes / 1024.0 / 1024.0, 2)                                     AS total_wal_mb,
+    round(
+        (wal_bytes / 1024.0 / 1024.0)
+        / nullif(extract(epoch from (now() - stats_reset)) / 3600.0, 0)::numeric, 2
+    )                                                                          AS wal_mb_per_hour,
+    round(
+        wal_fpi::numeric / nullif(wal_records, 0) * 100, 2
+    )                                                                          AS fpi_pct,
+    stats_reset
+FROM pg_stat_wal;`
+  },
+  {
+    id: '34',
+    title: 'Partitioned Table Health',
+    area: 'Tables & Storage',
+    areaSlug: 'table',
+    what: 'Partitioned tables, partition counts, and total sizes.',
+    lookFor: 'partition_count > 100 | partition_count = 0',
+    action: 'Merge old partitions or partition by larger range; create missing partitions.',
+    sql: `SELECT
+    n.nspname                                                                  AS schemaname,
+    c.relname                                                                  AS table_name,
+    count(i.inhrelid)                                                          AS partition_count,
+    pg_size_pretty(pg_total_relation_size(c.oid))                              AS total_size,
+    pg_size_pretty(pg_relation_size(c.oid))                                    AS parent_size
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+LEFT JOIN pg_inherits i ON i.inhparent = c.oid
+WHERE c.relkind = 'p'
+  AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+GROUP BY n.nspname, c.relname, c.oid
+ORDER BY partition_count DESC;`
+  },
+  {
+    id: '35',
+    title: 'Open Prepared Transactions',
+    area: 'Critical Risk Signals',
+    areaSlug: 'risk',
+    what: 'Uncommitted prepared transactions (2PC/two-phase commit).',
+    lookFor: 'Any row older than 5 minutes (blocks vacuum, holds locks)',
+    action: 'Run COMMIT PREPARED '<gid>'; or ROLLBACK PREPARED '<gid>';.',
+    sql: `SELECT
+    gid,
+    prepared,
+    owner,
+    database,
+    now() - prepared                                                          AS age,
+    transaction::text                                                          AS xid
+FROM pg_prepared_xacts
+ORDER BY prepared ASC;`
+  },
+  {
+    id: '36',
+    title: 'I/O Stats by Backend (pg_stat_io)',
+    area: 'Config & Health',
+    areaSlug: 'config',
+    what: 'I/O statistics broken down by backend type, target object, and context.',
+    lookFor: 'High evictions | high temp relation reads/writes',
+    action: 'Increase work_mem if temp relation I/O is high; increase shared_buffers if evictions are high; tune checkpointer if writes dominate backends.',
+    requires: 'PostgreSQL 16+, track_io_timing = on (optional for timings)',
+    sql: `SELECT
+    backend_type,
+    object,
+    context,
+    reads,
+    round(read_time::numeric, 2)                                              AS read_time_ms,
+    writes,
+    round(write_time::numeric, 2)                                             AS write_time_ms,
+    hits,
+    evictions,
+    round(reads::numeric / nullif(reads + hits, 0) * 100, 2)                  AS read_pct
+FROM pg_stat_io
+WHERE reads + writes + hits > 0
+ORDER BY reads + writes DESC;`
   }
 ];

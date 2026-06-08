@@ -5,6 +5,7 @@
 -- Look for: High seq_tup_read + low idx_tup_fetch → missing index
 --           High n_tup_upd + high n_dead_tup → vacuum lag
 --           dead_pct > 10% → VACUUM urgently needed
+-- Action  : Add index for seq scan tables; run VACUUM ANALYZE for high dead_pct
 -- ============================================================
 
 SELECT

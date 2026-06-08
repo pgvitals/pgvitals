@@ -3,6 +3,7 @@
 -- ============================================================
 -- What    : Per-database throughput, cache hit, deadlocks, temp usage
 -- Look for: rollback_pct > 5% | deadlocks > 0 | cache_hit_pct < 95%
+-- Action  : Investigate rollback sources; add deadlock_timeout logging; tune shared_buffers
 -- ============================================================
 
 SELECT

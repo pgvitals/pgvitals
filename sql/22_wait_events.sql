@@ -5,6 +5,7 @@
 -- Look for: Lock waits > a few sessions (contention)
 --           LWLock:WALWrite / IO:DataFileRead spikes (I/O bound)
 --           Client:ClientRead (application not reading fast enough)
+-- Action  : Cross-reference with lock tree; investigate I/O if DataFileRead dominates
 -- ============================================================
 
 SELECT

@@ -50,9 +50,10 @@ jobs:
         run: |
           SQL_COUNT=$(ls sql/[0-9]*.sql | wc -l)
           echo "Section files: $SQL_COUNT"
-          echo "Expected: 33 (00 prerequisites + 01-32)"
-          if [ "$SQL_COUNT" -ne 33 ]; then
+          echo "Expected: 37 (00 prerequisites + 01-36)"
+          if [ "$SQL_COUNT" -ne 37 ]; then
             echo "Section count mismatch — update docs/SECTIONS.md if you added/removed a section"
+            exit 1
           fi
 
   syntax:

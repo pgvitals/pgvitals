@@ -30,6 +30,7 @@ Quick reference for all 32 diagnostic sections.
 | 12 | `sql/12_toast_bloat.sql` | Oversized TOAST tables | `toast_to_table_pct > 200%` |
 | 13 | `sql/13_table_size_ranking.sql` | Top space consumers | Unexpected growth |
 | 14 | `sql/14_table_access_patterns.sql` | Heap vs index fetch ratio | `dead_pct > 10%` |
+| 34 | `sql/34_partitioned_table_health.sql` | Partition count and sizes | `partition_count > 100` |
 
 ## Vacuum & Statistics
 
@@ -64,6 +65,7 @@ Quick reference for all 32 diagnostic sections.
 | 26 | `sql/26_xid_wraparound.sql` | XID exhaustion | `pct_used > 70%` |
 | 27 | `sql/27_mxid_wraparound.sql` | MultiXact exhaustion | `pct_used > 70%` |
 | 28 | `sql/28_sequence_exhaustion.sql` | Integer overflow risk | `pct_used > 80%` |
+| 35 | `sql/35_prepared_transactions.sql` | Two-phase commit transaction leaks | Any row > 5 minutes |
 
 ## Config & Health
 
@@ -73,3 +75,5 @@ Quick reference for all 32 diagnostic sections.
 | 30 | `sql/30_buffer_cache_hit.sql` | Cache hit ratio per table | `hit_ratio_pct < 95%` |
 | 31 | `sql/31_checkpoint_pressure.sql` | Forced checkpoints, backend fsync | `forced_pct > 10%` |
 | 32 | `sql/32_database_summary.sql` | DB-level rollbacks, deadlocks | `rollback_pct > 5%`, `deadlocks > 0` |
+| 33 | `sql/33_wal_generation.sql` | WAL generation volume & rate | `wal_mb_per_hour > 1000` |
+| 36 | `sql/36_pg_stat_io.sql` | I/O statistics by backend type | Evictions / Temp I/O spike |

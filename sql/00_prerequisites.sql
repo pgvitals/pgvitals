@@ -1,7 +1,9 @@
 -- ============================================================
 -- 00 · PREREQUISITES CHECK
 -- ============================================================
--- Run this first to confirm your environment is ready.
+-- What    : Confirm your database environment is ready for pgvitals
+-- Look for: has_pg_monitor = true and pg_stat_statements installed
+-- Action  : Install pg_stat_statements; grant pg_monitor role to your user
 -- Requires: pg_stat_statements in shared_preload_libraries
 -- ============================================================
 

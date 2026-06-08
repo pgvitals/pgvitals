@@ -12,6 +12,10 @@
 
 -- ============================================================
 -- SECTION 00 · PREREQUISITES CHECK
+-- What    : Confirm your database environment is ready for pgvitals
+-- Look for: has_pg_monitor = true and pg_stat_statements installed
+-- Action  : Install pg_stat_statements; grant pg_monitor role to your user
+-- Requires: pg_stat_statements in shared_preload_libraries
 -- ============================================================
 
 -- Check pg_stat_statements is active
@@ -697,6 +701,7 @@ LIMIT 20;
 -- SECTION 13 · TABLE & INDEX SIZE RANKING
 -- What    : Largest objects by total, heap, index, and TOAST size
 -- Look for: Unexpected growth; index_size >> table_size
+-- Action  : Investigate large objects; review index necessity
 -- ============================================================
 
 SELECT
@@ -722,6 +727,7 @@ LIMIT 30;
 -- What    : Heap vs index fetch ratio per table
 -- Look for: High seq_tup_read with low idx_tup_fetch (missing index)
 --           High n_tup_upd with high n_dead_tup (vacuum lag)
+-- Action  : Add index for seq scan tables; run VACUUM ANALYZE for high dead_pct
 -- ============================================================
 
 SELECT
@@ -936,6 +942,7 @@ ORDER BY l.pid;
 -- SECTION 22 · WAIT EVENTS BREAKDOWN
 -- What    : What all sessions are currently waiting on
 -- Look for: Lock, LWLock, IO waits > a few sessions
+-- Action  : Cross-reference with lock tree; investigate I/O if DataFileRead dominates
 -- ============================================================
 
 SELECT
@@ -1197,6 +1204,7 @@ FROM pg_stat_bgwriter;
 -- SECTION 32 · DATABASE-LEVEL SUMMARY
 -- What    : Per-database throughput, cache, deadlocks, temp usage
 -- Look for: rollback_pct > 5%; deadlocks > 0; cache_hit_pct < 95%
+-- Action  : Investigate rollback sources; add deadlock_timeout logging; tune shared_buffers
 -- ============================================================
 
 SELECT
@@ -1222,6 +1230,100 @@ SELECT
 FROM pg_stat_database
 WHERE datname NOT IN ('template0', 'template1')
 ORDER BY numbackends DESC;
+
+
+-- ============================================================
+-- SECTION 33 · WAL GENERATION RATE
+-- What    : WAL (Write-Ahead Log) generation volume and rate since stats reset
+-- Look for: High wal_mb_per_hour (e.g. > 1000 MB/hr) indicating write intensity;
+--           high fpi_pct (> 20%) indicating potential checkpoint pressure
+-- Action  : Enable wal_compression; tune max_wal_size and checkpoint_timeout;
+--           investigate write-heavy queries or large updates
+-- Requires: PostgreSQL 14+
+-- ============================================================
+
+SELECT
+    wal_records,
+    wal_fpi,
+    pg_size_pretty(wal_bytes)                                                 AS total_wal_size,
+    round(wal_bytes / 1024.0 / 1024.0, 2)                                     AS total_wal_mb,
+    round(
+        (wal_bytes / 1024.0 / 1024.0)
+        / nullif(extract(epoch from (now() - stats_reset)) / 3600.0, 0)::numeric, 2
+    )                                                                          AS wal_mb_per_hour,
+    round(
+        wal_fpi::numeric / nullif(wal_records, 0) * 100, 2
+    )                                                                          AS fpi_pct,
+    stats_reset
+FROM pg_stat_wal;
+
+
+-- ============================================================
+-- SECTION 34 · PARTITIONED TABLE HEALTH
+-- What    : Partitioned tables, partition counts, and total sizes
+-- Look for: partition_count > 100 (high planning overhead);
+--           partition_count = 0 (inserts will fail unless default partition exists)
+-- Action  : Merge old partitions or partition by larger range (e.g. monthly);
+--           create missing partitions if partition_count = 0
+-- ============================================================
+
+SELECT
+    n.nspname                                                                  AS schemaname,
+    c.relname                                                                  AS table_name,
+    count(i.inhrelid)                                                          AS partition_count,
+    pg_size_pretty(pg_total_relation_size(c.oid))                              AS total_size,
+    pg_size_pretty(pg_relation_size(c.oid))                                    AS parent_size
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+LEFT JOIN pg_inherits i ON i.inhparent = c.oid
+WHERE c.relkind = 'p'
+  AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+GROUP BY n.nspname, c.relname, c.oid
+ORDER BY partition_count DESC;
+
+
+-- ============================================================
+-- SECTION 35 · OPEN PREPARED TRANSACTIONS
+-- What    : Uncommitted prepared transactions (2PC/two-phase commit)
+-- Look for: Any row older than 5 minutes (blocks vacuum, holds locks)
+-- Action  : Run COMMIT PREPARED '<gid>'; or ROLLBACK PREPARED '<gid>';
+-- ============================================================
+
+SELECT
+    gid,
+    prepared,
+    owner,
+    database,
+    now() - prepared                                                          AS age,
+    transaction::text                                                          AS xid
+FROM pg_prepared_xacts
+ORDER BY prepared ASC;
+
+
+-- ============================================================
+-- SECTION 36 · I/O STATS BY BACKEND (pg_stat_io)
+-- What    : I/O statistics broken down by backend type, target object, and context
+-- Look for: High evictions (shared_buffers size too small); high temp relation
+--           reads/writes (queries spilling to disk/work_mem too small)
+-- Action  : Increase work_mem if temp relation I/O is high; increase shared_buffers
+--           if evictions are high; tune checkpointer if writes dominate backends
+-- Requires: PostgreSQL 16+, track_io_timing = on (optional for timings)
+-- ============================================================
+
+SELECT
+    backend_type,
+    object,
+    context,
+    reads,
+    round(read_time::numeric, 2)                                              AS read_time_ms,
+    writes,
+    round(write_time::numeric, 2)                                             AS write_time_ms,
+    hits,
+    evictions,
+    round(reads::numeric / nullif(reads + hits, 0) * 100, 2)                  AS read_pct
+FROM pg_stat_io
+WHERE reads + writes + hits > 0
+ORDER BY reads + writes DESC;
 
 
 -- ============================================================

@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>pgvitals — PostgreSQL Performance Diagnostics</title>
-  <meta name="description" content="32 copy-paste PostgreSQL diagnostic queries covering every performance bottleneck. No install. No agents. Just SQL." />
+  <meta name="description" content="36 copy-paste PostgreSQL diagnostic queries covering every performance bottleneck. No install. No agents. Just SQL." />
   <meta property="og:title" content="pgvitals — PostgreSQL Performance Diagnostics" />
-  <meta property="og:description" content="32 copy-paste SQL queries for every PostgreSQL bottleneck — slow queries, bloat, locks, replication lag, wraparound risk and more." />
+  <meta property="og:description" content="36 copy-paste SQL queries for every PostgreSQL bottleneck — slow queries, bloat, locks, replication lag, wraparound risk and more." />
   <meta property="og:url" content="https://pgvitals.github.io/" />
   <meta property="og:type" content="website" />
   <meta property="og:image" content="https://pgvitals.github.io/og-image.svg" />
@@ -763,6 +763,261 @@
       .stats-inner { grid-template-columns: repeat(2, 1fr); }
       .nav-links { display: none; }
     }
+
+    /* ── Triage Section ──────────────────────────────────── */
+    .triage-container {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 24px;
+      margin-top: 24px;
+    }
+
+    .triage-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .triage-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 18px;
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      cursor: pointer;
+      text-align: left;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ink-mid);
+      transition: all 0.15s;
+    }
+
+    .triage-btn:hover {
+      border-color: var(--accent-light);
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    .triage-btn.active {
+      border-color: var(--accent);
+      background: var(--accent-pale);
+      color: var(--accent);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.05);
+    }
+
+    .triage-btn-icon {
+      font-size: 18px;
+    }
+
+    .triage-content {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+    }
+
+    .triage-header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 20px;
+      margin-bottom: 24px;
+    }
+
+    .triage-title-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .triage-icon {
+      font-size: 24px;
+    }
+
+    .triage-active-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--ink);
+    }
+
+    .triage-trigger {
+      font-size: 14px;
+      color: var(--slate);
+      line-height: 1.6;
+    }
+
+    .triage-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    .triage-step {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    .triage-step-head {
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .triage-step-num {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .triage-step-badge {
+      font-size: 10px;
+      font-weight: 700;
+      background: rgba(37, 99, 235, 0.08);
+      color: var(--accent);
+      padding: 2px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .triage-step-title-link {
+      font-size: 13px;
+      color: var(--slate);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.12s;
+    }
+
+    .triage-step-title-link:hover {
+      color: var(--accent);
+      text-decoration: underline;
+    }
+
+    .triage-step-body {
+      padding: 20px;
+    }
+
+    .triage-step-rationale {
+      font-size: 14px;
+      color: var(--ink-mid);
+      margin-bottom: 16px;
+      line-height: 1.6;
+    }
+
+    .triage-diagnostics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .triage-diag-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+    }
+
+    .triage-diag-lbl {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--slate);
+      margin-bottom: 4px;
+    }
+
+    .triage-diag-val {
+      font-size: 12.5px;
+      color: var(--ink);
+      line-height: 1.5;
+    }
+
+    .triage-diag-val code {
+      background: rgba(0, 0, 0, 0.05);
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-family: monospace;
+    }
+
+    .triage-sql-box {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .triage-sql-bar {
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .triage-sql-lbl {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: var(--slate);
+    }
+
+    .triage-sql-copy {
+      font-size: 11px;
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 3px 10px;
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--ink-mid);
+      transition: all 0.12s;
+    }
+
+    .triage-sql-copy:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .triage-sql-copy.copied {
+      background: var(--green-pale);
+      border-color: var(--green-border);
+      color: var(--green);
+    }
+
+    .triage-sql-code {
+      margin: 0;
+      padding: 14px 16px;
+      background: #0f172a;
+      color: #e2e8f0;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.8;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    @media (max-width: 900px) {
+      .triage-container {
+        grid-template-columns: 1fr;
+      }
+      .triage-diagnostics-grid {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 <body>
@@ -793,7 +1048,7 @@
         <span>🩺</span> PostgreSQL Diagnostics
       </div>
       <h1>Stop Guessing.<br><em>Start Diagnosing.</em></h1>
-      <p class="hero-desc">32 copy-paste SQL queries that cover every PostgreSQL performance bottleneck. Run them in psql, pgAdmin, or any SQL client. No agents. No install. Just SQL.</p>
+      <p class="hero-desc">36 copy-paste SQL queries that cover every PostgreSQL performance bottleneck. Run them in psql, pgAdmin, or any SQL client. No agents. No install. Just SQL.</p>
       <div class="hero-ctas">
         <a class="btn-hero-primary" href="/diagnostics.html">Open Diagnostics →</a>
         <a class="btn-hero-ghost" href="https://github.com/pgvitals/pgvitals" target="_blank" rel="noopener">
@@ -845,7 +1100,7 @@
 <div class="stats-strip">
   <div class="stats-inner">
     <div class="stat-item">
-      <div class="stat-value">32</div>
+      <div class="stat-value">36</div>
       <div class="stat-label">Diagnostic sections</div>
     </div>
     <div class="stat-item">
@@ -863,12 +1118,44 @@
   </div>
 </div>
 
+<!-- Guided Triage -->
+<section class="section" id="triage">
+  <div class="section-inner">
+    <div class="section-label">Triage</div>
+    <h2 class="section-heading">Guided Symptom Triage</h2>
+    <p class="section-sub">Choose a common symptom below to view a step-by-step diagnostic path with copy-pasteable SQL. Powered by pgvitals diagnostics.</p>
+    
+    <div class="triage-container">
+      <!-- Left sidebar: Symptom list -->
+      <div class="triage-sidebar" id="triage-sidebar">
+        <!-- Renders dynamically -->
+      </div>
+      
+      <!-- Right panel: Active triage runbook steps -->
+      <div class="triage-content">
+        <div class="triage-header">
+          <div class="triage-title-row">
+            <span class="triage-icon" id="triage-icon">🐌</span>
+            <h3 class="triage-active-title" id="triage-active-title">Queries suddenly slow</h3>
+          </div>
+          <p class="triage-trigger" id="triage-trigger">Response times jumped; users reporting slowness...</p>
+        </div>
+        
+        <!-- Steps container -->
+        <div class="triage-steps" id="triage-steps">
+          <!-- Renders dynamically -->
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- Coverage -->
 <section class="section alt">
   <div class="section-inner">
     <div class="section-label">Coverage</div>
     <h2 class="section-heading">Every bottleneck, one place.</h2>
-    <p class="section-sub">8 diagnostic areas, 32 sections, each with a clear threshold and action step so you always know what to do next.</p>
+    <p class="section-sub">8 diagnostic areas, 36 sections, each with a clear threshold and action step so you always know what to do next.</p>
     <div class="coverage-grid">
       <div class="cov-card">
         <div class="cov-icon">⚡</div>
@@ -884,9 +1171,9 @@
       </div>
       <div class="cov-card">
         <div class="cov-icon">🗄</div>
-        <div class="cov-sections">Sections 11–14</div>
+        <div class="cov-sections">Sections 11–14, 34</div>
         <div class="cov-title">Tables & Storage</div>
-        <div class="cov-desc">Table and TOAST bloat, size rankings, heap vs index access patterns</div>
+        <div class="cov-desc">Table and TOAST bloat, size rankings, heap vs index access patterns, partition health</div>
       </div>
       <div class="cov-card">
         <div class="cov-icon">🧹</div>
@@ -908,9 +1195,9 @@
       </div>
       <div class="cov-card">
         <div class="cov-icon">⚠️</div>
-        <div class="cov-sections">Sections 26–28</div>
+        <div class="cov-sections">Sections 26–28, 35</div>
         <div class="cov-title">Risk Signals</div>
-        <div class="cov-desc">XID and MultiXact wraparound risk, sequence exhaustion — the silent killers</div>
+        <div class="cov-desc">XID and MultiXact wraparound risk, sequence exhaustion, prepared transactions — the silent killers</div>
       </div>
       <div class="cov-card">
         <div class="cov-icon">⚙️</div>
@@ -938,7 +1225,7 @@
       <div class="step-card">
         <div class="step-num">2</div>
         <div class="step-title">Full diagnostic sweep</div>
-        <div class="step-desc">Run all 32 sections in sequence before a release or after a migration. The master.sql file combines everything.</div>
+        <div class="step-desc">Run all 36 sections in sequence before a release or after a migration. The master.sql file combines everything.</div>
         <div class="step-code">psql -d mydb -f master.sql</div>
       </div>
       <div class="step-card">
@@ -1023,7 +1310,7 @@
     <div class="cta-inner">
       <div class="section-label light">Get started</div>
       <h2 class="section-heading light">Your database is telling you something.</h2>
-      <p class="section-sub light">32 sections. Every bottleneck covered. Copy, paste, act.</p>
+      <p class="section-sub light">36 sections. Every bottleneck covered. Copy, paste, act.</p>
       <div class="cta-actions">
         <a class="btn-cta-primary" href="/diagnostics.html">Open Diagnostics →</a>
         <a class="btn-cta-ghost" href="https://github.com/pgvitals/pgvitals" target="_blank" rel="noopener">
@@ -1046,6 +1333,120 @@
     </span>
   </div>
 </footer>
+
+<div class="toast" id="toast"></div>
+
+<script src="sections.js"></script>
+<script src="runbooks.js"></script>
+<script>
+  let activeSymptomId = 'slow-queries';
+  let toastTimer = null;
+
+  function toSlug(title) {
+    return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  }
+
+  function selectSymptom(id) {
+    activeSymptomId = id;
+    renderSidebar();
+    renderContent();
+  }
+
+  function copyText(btn, text) {
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'Copy';
+        btn.classList.remove('copied');
+      }, 2000);
+    }).catch(err => {
+      console.error('Failed to copy: ', err);
+    });
+  }
+
+  function renderSidebar() {
+    const sidebar = document.getElementById('triage-sidebar');
+    if (!sidebar) return;
+    sidebar.innerHTML = '';
+    
+    RUNBOOKS.forEach(r => {
+      const btn = document.createElement('button');
+      btn.className = `triage-btn ${r.id === activeSymptomId ? 'active' : ''}`;
+      btn.onclick = () => selectSymptom(r.id);
+      btn.innerHTML = `
+        <span class="triage-btn-icon">${r.icon}</span>
+        <span>${r.symptom}</span>
+      `;
+      sidebar.appendChild(btn);
+    });
+  }
+
+  function renderContent() {
+    const runbook = RUNBOOKS.find(r => r.id === activeSymptomId);
+    if (!runbook) return;
+    
+    document.getElementById('triage-icon').textContent = runbook.icon;
+    document.getElementById('triage-active-title').textContent = runbook.symptom;
+    document.getElementById('triage-trigger').textContent = runbook.trigger;
+    
+    const stepsContainer = document.getElementById('triage-steps');
+    stepsContainer.innerHTML = '';
+    
+    runbook.steps.forEach((step, idx) => {
+      const section = SECTIONS.find(s => s.id === step.sectionId);
+      const sqlQuery = section ? section.sql : '-- Query not found';
+      const detailSlug = section ? toSlug(section.title) : '';
+      
+      const stepDiv = document.createElement('div');
+      stepDiv.className = 'triage-step';
+      stepDiv.innerHTML = `
+        <div class="triage-step-head">
+          <div class="triage-step-num">
+            <span>Step ${idx + 1}</span>
+            <span class="triage-step-badge">Section ${step.sectionId}</span>
+          </div>
+          <a class="triage-step-title-link" href="/diagnostics.html#${detailSlug}" target="_blank">
+            ${step.sectionTitle} &rarr;
+          </a>
+        </div>
+        <div class="triage-step-body">
+          <p class="triage-step-rationale">${step.rationale}</p>
+          <div class="triage-diagnostics-grid">
+            <div class="triage-diag-card">
+              <div class="triage-diag-lbl">Look for</div>
+              <div class="triage-diag-val">${step.lookFor}</div>
+            </div>
+            <div class="triage-diag-card">
+              <div class="triage-diag-lbl">Next Action</div>
+              <div class="triage-diag-val">${step.ifHot}</div>
+            </div>
+          </div>
+          <div class="triage-sql-box">
+            <div class="triage-sql-bar">
+              <span class="triage-sql-lbl">SQL Query</span>
+              <button class="triage-sql-copy" onclick="copyText(this, \`${sqlQuery.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)">Copy</button>
+            </div>
+            <pre class="triage-sql-code"><code>${escapeHtml(sqlQuery)}</code></pre>
+          </div>
+        </div>
+      `;
+      stepsContainer.appendChild(stepDiv);
+    });
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;');
+  }
+
+  // Initialize
+  document.addEventListener('DOMContentLoaded', () => {
+    renderSidebar();
+    renderContent();
+  });
+</script>
 
 </body>
 </html>

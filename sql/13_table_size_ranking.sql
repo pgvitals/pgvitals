@@ -4,6 +4,7 @@
 -- What    : Largest objects ranked by total size
 -- Look for: indexes_size >> heap_size (over-indexed tables)
 --           toast_size unexpectedly large
+-- Action  : Investigate large objects; review index necessity
 -- ============================================================
 
 SELECT

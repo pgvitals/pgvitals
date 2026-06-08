@@ -2,7 +2,7 @@
 
 # 🩺 pgvitals
 
-**32 copy-paste PostgreSQL diagnostic queries — one for every performance bottleneck.**
+**36 copy-paste PostgreSQL diagnostic queries — one for every performance bottleneck.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14%2B-blue?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
@@ -54,12 +54,12 @@ GRANT pg_monitor TO your_user;   -- PostgreSQL 10+
 |------|----------|-----------------|
 | **Query behavior** | 01–05 | Slow queries · temp spill · seq scan storms · N+1 · JIT overhead |
 | **Index health** | 06–10 | Unused · duplicate · invalid · missing FK indexes · bloat |
-| **Tables & storage** | 11–14 | Table bloat · TOAST bloat · size ranking · access patterns |
+| **Tables & storage** | 11–14, 34 | Table bloat · TOAST bloat · size ranking · access patterns · partition health |
 | **Vacuum & stats** | 15–18 | Autovacuum progress · dead tuple backlog · stale stats · blocking txns |
 | **Connections & locks** | 19–22 | Connection saturation · idle-in-txn · lock trees · wait events |
 | **Replication** | 23–25 | Streaming lag · logical slot lag · WAL retention |
-| **Risk signals** | 26–28 | XID wraparound · MultiXact wraparound · sequence exhaustion |
-| **Config & health** | 29–32 | GUC review · buffer cache · checkpoint pressure · DB summary |
+| **Risk signals** | 26–28, 35 | XID wraparound · MultiXact wraparound · sequence exhaustion · prepared transactions |
+| **Config & health** | 29–32, 33, 36 | GUC review · buffer cache · checkpoint pressure · DB summary · WAL rate · I/O stats |
 
 ---
 
@@ -151,7 +151,7 @@ DROP SCHEMA perf_monitor CASCADE;
 </details>
 
 <details>
-<summary><b>Tables & Storage (11–14)</b></summary>
+<summary><b>Tables & Storage (11–14, 34)</b></summary>
 
 | # | File | What it catches | Threshold |
 |---|------|-----------------|-----------|
@@ -159,6 +159,7 @@ DROP SCHEMA perf_monitor CASCADE;
 | 12 | `sql/12_toast_bloat.sql` | Oversized TOAST tables | `toast_to_table_pct > 200%` |
 | 13 | `sql/13_table_size_ranking.sql` | Top space consumers | Unexpected growth |
 | 14 | `sql/14_table_access_patterns.sql` | Heap vs index fetch ratio | `dead_pct > 10%` |
+| 34 | `sql/34_partitioned_table_health.sql` | Partition count and sizes | `partition_count > 100` |
 
 </details>
 
@@ -198,18 +199,19 @@ DROP SCHEMA perf_monitor CASCADE;
 </details>
 
 <details>
-<summary><b>Critical Risk Signals (26–28)</b></summary>
+<summary><b>Critical Risk Signals (26–28, 35)</b></summary>
 
 | # | File | What it catches | Threshold |
 |---|------|-----------------|-----------|
 | 26 | `sql/26_xid_wraparound.sql` | Transaction ID exhaustion | `pct_used > 70%` |
 | 27 | `sql/27_mxid_wraparound.sql` | MultiXact ID exhaustion | `pct_used > 70%` |
 | 28 | `sql/28_sequence_exhaustion.sql` | Sequences approaching integer overflow | `pct_used > 80%` |
+| 35 | `sql/35_prepared_transactions.sql` | Two-phase commit transaction leaks | Any row > 5 minutes |
 
 </details>
 
 <details>
-<summary><b>Config & Health (29–32)</b></summary>
+<summary><b>Config & Health (29–32, 33, 36)</b></summary>
 
 | # | File | What it catches | Threshold |
 |---|------|-----------------|-----------|
@@ -217,6 +219,8 @@ DROP SCHEMA perf_monitor CASCADE;
 | 30 | `sql/30_buffer_cache_hit.sql` | Cache hit ratio per table and globally | `hit_ratio_pct < 95%` |
 | 31 | `sql/31_checkpoint_pressure.sql` | Forced checkpoints and backend fsync | `forced_pct > 10%`, `backend_fsync > 0` |
 | 32 | `sql/32_database_summary.sql` | DB-level rollbacks, deadlocks, temp usage | `rollback_pct > 5%`, `deadlocks > 0` |
+| 33 | `sql/33_wal_generation.sql` | WAL generation volume and rate | `wal_mb_per_hour > 1000` |
+| 36 | `sql/36_pg_stat_io.sql` | I/O statistics by backend type | Evictions / Temp I/O spike |
 
 </details>
 

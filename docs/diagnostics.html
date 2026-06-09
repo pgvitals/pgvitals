@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Diagnostics — pgvitals</title>
-  <meta name="description" content="32 PostgreSQL diagnostic SQL queries. Search, filter by area, expand and copy." />
+  <meta name="description" content="40 PostgreSQL diagnostic SQL queries. Search, filter by area, expand and copy." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet" />
@@ -271,7 +271,8 @@
     .chip[data-area="connections"].active { --accent-pale: rgba(245,158,11,.18); --accent-border: rgba(245,158,11,.3); --accent-text: #fcd34d; }
     .chip[data-area="replication"].active { --accent-pale: rgba(6,182,212,.18); --accent-border: rgba(6,182,212,.3);  --accent-text: #67e8f9; }
     .chip[data-area="risk"].active     { --accent-pale: rgba(239,68,68,.18);  --accent-border: rgba(239,68,68,.3);  --accent-text: #fca5a5; }
-    .chip[data-area="config"].active   { --accent-pale: rgba(100,116,139,.18);--accent-border: rgba(100,116,139,.3);--accent-text: #cbd5e1; }
+    .chip[data-area="config"].active     { --accent-pale: rgba(100,116,139,.18);--accent-border: rgba(100,116,139,.3);--accent-text: #cbd5e1; }
+    .chip[data-area="inventory"].active  { --accent-pale: rgba(20,184,166,.18); --accent-border: rgba(20,184,166,.3);  --accent-text: #5eead4; }
 
     .toolbar-right {
       display: flex;
@@ -686,6 +687,7 @@
       <div class="chip" data-area="replication" onclick="filterArea(this)"><span class="chip-dot" style="color:#06b6d4"></span>Replication</div>
       <div class="chip" data-area="risk"        onclick="filterArea(this)"><span class="chip-dot" style="color:#ef4444"></span>Risk</div>
       <div class="chip" data-area="config"      onclick="filterArea(this)"><span class="chip-dot" style="color:#64748b"></span>Config</div>
+      <div class="chip" data-area="inventory"   onclick="filterArea(this)"><span class="chip-dot" style="color:#14b8a6"></span>Inventory</div>
     </div>
     <div class="toolbar-right">
       <span class="result-count" id="result-count"></span>

@@ -103,9 +103,13 @@ SECTION_META: dict[str, dict[str, str]] = {
     "31": {"area": "Config & Health",  "risk": "medium"},
     "32": {"area": "Config & Health",  "risk": "info"},
     "33": {"area": "Config & Health",  "risk": "medium"},
-    "34": {"area": "Tables & Storage", "risk": "low"},
-    "35": {"area": "Risk Signals",     "risk": "high"},
-    "36": {"area": "Config & Health",  "risk": "medium"},
+    "34": {"area": "Tables & Storage",      "risk": "low"},
+    "35": {"area": "Risk Signals",           "risk": "high"},
+    "36": {"area": "Config & Health",        "risk": "medium"},
+    "37": {"area": "Inventory & Extensions", "risk": "medium"},
+    "38": {"area": "Inventory & Extensions", "risk": "medium"},
+    "39": {"area": "Inventory & Extensions", "risk": "low"},
+    "40": {"area": "Inventory & Extensions", "risk": "info"},
 }
 
 

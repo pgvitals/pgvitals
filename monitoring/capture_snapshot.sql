@@ -168,19 +168,36 @@ BEGIN
     FROM pg_stat_replication;
 
     -- Checkpoint stats
-    INSERT INTO perf_monitor.checkpoint_stats
-        (snapshot_id, captured_at, checkpoints_timed, checkpoints_req,
-         forced_pct, checkpoint_write_time, checkpoint_sync_time,
-         buffers_checkpoint, buffers_clean,
-         buffers_backend, buffers_backend_fsync, maxwritten_clean)
-    SELECT
-        v_snapshot_id, v_now,
-        checkpoints_timed, checkpoints_req,
-        round(checkpoints_req::numeric / nullif(checkpoints_timed + checkpoints_req, 0) * 100, 2),
-        checkpoint_write_time, checkpoint_sync_time,
-        buffers_checkpoint, buffers_clean,
-        buffers_backend, buffers_backend_fsync, maxwritten_clean
-    FROM pg_stat_bgwriter;
+    -- PG17+: checkpoint columns moved from pg_stat_bgwriter to pg_stat_checkpointer
+    IF current_setting('server_version_num')::int >= 170000 THEN
+        INSERT INTO perf_monitor.checkpoint_stats
+            (snapshot_id, captured_at, checkpoints_timed, checkpoints_req,
+             forced_pct, checkpoint_write_time, checkpoint_sync_time,
+             buffers_checkpoint, buffers_clean,
+             buffers_backend, buffers_backend_fsync, maxwritten_clean)
+        SELECT
+            v_snapshot_id, v_now,
+            cp.num_timed, cp.num_requested,
+            round(cp.num_requested::numeric / nullif(cp.num_timed + cp.num_requested, 0) * 100, 2),
+            cp.write_time, cp.sync_time,
+            cp.buffers_written, bg.buffers_clean,
+            bg.buffers_backend, bg.buffers_backend_fsync, bg.maxwritten_clean
+        FROM pg_stat_checkpointer cp, pg_stat_bgwriter bg;
+    ELSE
+        INSERT INTO perf_monitor.checkpoint_stats
+            (snapshot_id, captured_at, checkpoints_timed, checkpoints_req,
+             forced_pct, checkpoint_write_time, checkpoint_sync_time,
+             buffers_checkpoint, buffers_clean,
+             buffers_backend, buffers_backend_fsync, maxwritten_clean)
+        SELECT
+            v_snapshot_id, v_now,
+            checkpoints_timed, checkpoints_req,
+            round(checkpoints_req::numeric / nullif(checkpoints_timed + checkpoints_req, 0) * 100, 2),
+            checkpoint_write_time, checkpoint_sync_time,
+            buffers_checkpoint, buffers_clean,
+            buffers_backend, buffers_backend_fsync, maxwritten_clean
+        FROM pg_stat_bgwriter;
+    END IF;
 
     RETURN v_snapshot_id;
 END;

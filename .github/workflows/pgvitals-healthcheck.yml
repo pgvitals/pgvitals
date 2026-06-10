@@ -1,0 +1,117 @@
+# pgvitals-healthcheck.yml
+#
+# Copy this file to your repo at .github/workflows/pgvitals-healthcheck.yml
+# to run a PostgreSQL health check on every deploy or on a schedule.
+#
+# The health score is posted to the GitHub Actions job summary — no external
+# services, no tokens, no setup beyond a working database connection.
+#
+# Required secrets (set in Settings → Secrets → Actions):
+#   PGHOST      — database host
+#   PGPORT      — database port (default: 5432)
+#   PGDATABASE  — database name
+#   PGUSER      — database user
+#   PGPASSWORD  — database password
+#
+# Optional: remove the 'schedule' trigger if you only want it on push/PR.
+
+name: pgvitals Health Check
+
+on:
+  workflow_dispatch:          # run manually from Actions tab
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    - cron: '0 6 * * 1'      # every Monday at 06:00 UTC
+
+jobs:
+  health-check:
+    name: PostgreSQL Health Score
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    services:
+      # ── Remove this block if connecting to an external database ──────────
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: testdb
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      # ─────────────────────────────────────────────────────────────────────
+
+    env:
+      # ── For the built-in service above ───────────────────────────────────
+      PGHOST:     localhost
+      PGPORT:     5432
+      PGDATABASE: testdb
+      PGUSER:     postgres
+      PGPASSWORD: postgres
+      # ── For an external database, replace with secrets: ──────────────────
+      # PGHOST:     ${{ secrets.PGHOST }}
+      # PGPORT:     ${{ secrets.PGPORT }}
+      # PGDATABASE: ${{ secrets.PGDATABASE }}
+      # PGUSER:     ${{ secrets.PGUSER }}
+      # PGPASSWORD: ${{ secrets.PGPASSWORD }}
+      # ─────────────────────────────────────────────────────────────────────
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Install psql client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      - name: Run pgvitals health score
+        id: health
+        run: |
+          # Download health_score.sql if running from a copy of this workflow
+          if [ ! -f health_score.sql ]; then
+            curl -sSL \
+              https://raw.githubusercontent.com/pgvitals/pgvitals/master/health_score.sql \
+              -o health_score.sql
+          fi
+
+          OUTPUT=$(PGPASSWORD="$PGPASSWORD" psql \
+            -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" \
+            -f health_score.sql 2>&1)
+
+          echo "$OUTPUT"
+
+          # Extract score line for the step summary
+          SCORE_LINE=$(echo "$OUTPUT" | grep -E '^\s*[0-9]+ / 100' | head -1 | xargs)
+          GRADE=$(echo "$OUTPUT" | grep -E '^\s*[ABCDFabcdf]\s*\|' | head -1 | awk -F'|' '{print $2}' | xargs)
+
+          echo "score_line=$SCORE_LINE" >> "$GITHUB_OUTPUT"
+          echo "grade=$GRADE"          >> "$GITHUB_OUTPUT"
+
+          # Write to job summary
+          {
+            echo "## pgvitals Health Check"
+            echo ""
+            echo "\`\`\`"
+            echo "$OUTPUT"
+            echo "\`\`\`"
+            echo ""
+            echo "_Run against \`${PGDATABASE}\` on \`${PGHOST}\`_"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail if grade is D or F
+        run: |
+          GRADE="${{ steps.health.outputs.grade }}"
+          echo "Grade: $GRADE"
+          if [[ "$GRADE" == "D" || "$GRADE" == "F" ]]; then
+            echo "::error::pgvitals health grade is $GRADE — database needs attention"
+            exit 1
+          fi

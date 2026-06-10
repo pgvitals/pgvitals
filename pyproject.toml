@@ -1,0 +1,52 @@
+[build-system]
+requires      = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name        = "pgvitals"
+version     = "1.1.0"
+description = "40 PostgreSQL diagnostic queries + health score runner — no extensions required"
+readme      = "README.md"
+license     = {text = "MIT"}
+requires-python = ">=3.8"
+keywords = [
+  "postgresql", "postgres", "database", "diagnostics",
+  "performance", "monitoring", "dba", "health-check",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Intended Audience :: System Administrators",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Database",
+  "Topic :: System :: Monitoring",
+  "Topic :: System :: Systems Administration",
+]
+
+# No runtime dependencies — psql is invoked as an external subprocess
+dependencies = []
+
+[project.scripts]
+pgvitals = "pgvitals.cli:main"
+
+[project.urls]
+Homepage      = "https://pgvitals.github.io/"
+Documentation = "https://pgvitals.github.io/diagnostics.html"
+Repository    = "https://github.com/pgvitals/pgvitals"
+"Bug Tracker" = "https://github.com/pgvitals/pgvitals/issues"
+Changelog     = "https://github.com/pgvitals/pgvitals/releases"
+
+[tool.setuptools]
+packages = ["pgvitals"]
+
+[tool.setuptools.package-data]
+pgvitals = ["sql/*.sql"]

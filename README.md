@@ -6,6 +6,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14%2B-blue?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![PyPI](https://img.shields.io/pypi/v/pgvitals?color=blue)](https://pypi.org/project/pgvitals/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 *No extensions. No installation. Just SQL.*
@@ -33,6 +34,17 @@ for f in sql/*.sql; do echo "=== $f ==="; psql -d mydb -f "$f"; done
 
 # Or load the combined master file
 psql -d mydb -f master.sql
+
+# Health score — 0-100 with per-check breakdown (no extensions needed)
+psql -d mydb -f health_score.sql
+```
+
+### Or install the CLI
+
+```bash
+pip install pgvitals
+pgvitals init                                         # download SQL files
+pgvitals --host db.example.com --database prod        # full diagnostic run
 ```
 
 **Prerequisites** (one-time setup):
@@ -126,7 +138,19 @@ DROP SCHEMA perf_monitor CASCADE;
 
 pgvitals includes a Python-based runner that executes all sections against a live database and generates a Markdown health report.
 
-### Quick Start
+### Via pip (recommended)
+
+```bash
+pip install pgvitals
+pgvitals init                                               # download SQL files once
+pgvitals --host db.example.com --user dba --database prod  # full diagnostic run
+pgvitals --profile staging                                  # use a named config profile
+pgvitals --sections 01,03,19,26,32                         # run specific sections only
+pgvitals --skip 05,36                                       # skip specific sections
+pgvitals --output ./report.md                               # custom output path
+```
+
+### Via script (no install)
 
 ```bash
 cd runner
@@ -142,15 +166,6 @@ python run_diagnostics.py --profile staging
 
 # Override connection via CLI
 python run_diagnostics.py --host db.example.com -U monitor -d production
-
-# Run specific sections only
-python run_diagnostics.py --sections 01,03,19,26,32
-
-# Skip sections
-python run_diagnostics.py --skip 05,36
-
-# Custom output path
-python run_diagnostics.py --output ./my_report.md
 ```
 
 ### Configuration
@@ -285,26 +300,80 @@ Reports are written to `runner/reports/` with auto-generated filenames and inclu
 
 ---
 
+## Health Score
+
+Get a single 0–100 score for your database with a per-check breakdown — no extensions, no config, just SQL:
+
+```bash
+psql -d mydb -f health_score.sql
+```
+
+```
+╔════════════════════════╤═════════╤══════════════════════════════╤══════════╤══════════╤══════════╗
+║ Score                  │ Grade   │ Status                       │ ✓ Passed │ ~ Warned │ ✗ Failed ║
+╠════════════════════════╪═════════╪══════════════════════════════╪══════════╪══════════╪══════════╣
+║ 87 / 100               │ B       │ Good — minor issues to review│        8 │        1 │        0 ║
+╚════════════════════════╧═════════╧══════════════════════════════╧══════════╧══════════╧══════════╝
+
+╔═══╤══════════════════════════╤═══════════╤═══════════╤════════════════════════════════════════╗
+║ # │ Check                    │ Score     │ Status    │ Detail                                 ║
+╠═══╪══════════════════════════╪═══════════╪═══════════╪════════════════════════════════════════╣
+║ 1 │ XID Wraparound           │ 20 / 20   │ ✓ Clear   │ max age: 2,933 txns (limit ~2 billion) ║
+║ 2 │ Dead Tuple Bloat         │ 15 / 15   │ ✓ Clear   │ 0 table(s) with >10% dead tuples       ║
+║ 3 │ Connection Saturation    │ 15 / 15   │ ✓ Clear   │ 63.0% of max_connections in use        ║
+║ 4 │ Lock Waits               │ 10 / 10   │ ✓ Clear   │ 0 session(s) currently blocked         ║
+║ 5 │ Buffer Cache Hit Ratio   │  5 / 10   │ ~ Warning │ 93.20% hit rate (target ≥ 95%)         ║
+║ 6 │ Invalid Indexes          │ 10 / 10   │ ✓ Clear   │ 0 invalid index(es) detected           ║
+║ 7 │ Idle-in-Transaction      │ 10 / 10   │ ✓ Clear   │ 0 session(s) stuck in open transaction ║
+║ 8 │ Replication Lag          │  5 /  5   │ ✓ Clear   │ 0 standby(s) configured                ║
+║ 9 │ Sequence Exhaustion      │  5 /  5   │ ✓ Clear   │ 0 sequence(s) above 80% capacity       ║
+╚═══╧══════════════════════════╧═══════════╧═══════════╧════════════════════════════════════════╝
+```
+
+---
+
+## GitHub Actions Integration
+
+Add a scheduled health check to any repo — copies the workflow template and wires up your DB secrets:
+
+```bash
+# Copy the template to your repo
+cp .github/workflows/pgvitals-healthcheck.yml path/to/your-repo/.github/workflows/
+
+# Set these secrets in Settings → Secrets → Actions:
+#   PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD
+```
+
+The health score runs on every push and on a weekly schedule. Results appear in the Actions job summary. The job fails if the grade drops to D or F.
+
+See the full template: [`.github/workflows/pgvitals-healthcheck.yml`](.github/workflows/pgvitals-healthcheck.yml)
+
+---
+
 ## Repository Layout
 
 ```
 pgvitals/
-├── sql/                        36 individual diagnostic queries
+├── sql/                        40 individual diagnostic queries
 │   ├── 00_prerequisites.sql
 │   ├── 01_slow_queries.sql
-│   ├── 02_temp_pressure.sql
 │   └── ...
+├── health_score.sql            0-100 health score (standalone)
 ├── monitoring/                 Load test snapshot framework
-│   ├── schema.sql              perf_monitor schema + tables
-│   ├── capture_snapshot.sql    capture_snapshot() function
-│   └── trend_queries.sql       delta and trend analysis queries
+│   ├── schema.sql
+│   ├── capture_snapshot.sql
+│   └── trend_queries.sql
 ├── runner/                     Diagnostic runner & report generator
 │   ├── run_diagnostics.py      Main runner script (Python 3.8+)
-│   ├── pgvitals.conf.example   Sample configuration file
-│   └── reports/                Auto-generated Markdown reports
+│   ├── pgvitals.conf.example
+│   └── reports/
+├── pgvitals/                   pip-installable package
+│   ├── __init__.py
+│   └── cli.py
+├── pyproject.toml              pip package config
 ├── docs/
-│   └── SECTIONS.md             Quick reference with thresholds
-├── master.sql                  All 40 sections in one file
+│   └── SECTIONS.md
+├── master.sql
 └── README.md
 ```
 
@@ -332,6 +401,9 @@ Most diagnostic tools require installation, a running agent, or a specific langu
 | Works on any server | ✅ | Log access needed | Agent needed | Local only |
 | Load test snapshots | ✅ | ❌ | ✅ | ❌ |
 | Copy-paste ready | ✅ | ❌ | ❌ | ❌ |
+| Health score (0-100) | ✅ | ❌ | ✅ | ❌ |
+| GitHub Actions ready | ✅ | ❌ | ❌ | ❌ |
+| pip installable | ✅ | ❌ | ❌ | ✅ |
 | Open source | ✅ | ✅ | ❌ | ✅ |
 
 ---

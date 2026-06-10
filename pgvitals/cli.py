@@ -12,6 +12,41 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from pgvitals import __version__
+
+_HELP = f"""\
+pgvitals {__version__} — PostgreSQL diagnostic queries and health score runner
+
+Usage:
+  pgvitals [options]            Run all 40 diagnostic sections
+  pgvitals init                 Download SQL files to ~/.pgvitals/sql/
+  pgvitals --version            Show version and exit
+
+Connection:
+  --host HOST         Database host (default: localhost)
+  --port PORT         Database port  (default: 5432)
+  --user USER         Database user  (default: $PGUSER or postgres)
+  --database DB       Database name  (default: $PGDATABASE)
+  --profile PROFILE   Named connection profile from pgvitals.conf
+
+Runner:
+  --sections LIST     Run specific sections, e.g. --sections 01,06,19
+  --skip    LIST      Skip specific sections, e.g. --skip 05,36
+  --output  PATH      Report output path (default: auto-named in ./reports/)
+  --sql-dir PATH      Override path to sql/ directory
+  --psql    PATH      Path to psql binary if not on PATH
+  --config  PATH      Config file (default: pgvitals.conf in runner dir)
+
+Health score:
+  psql -d mydb -f health_score.sql   # standalone 0-100 score, no runner needed
+
+First-time setup:
+  pgvitals init                      # download SQL files once
+  pgvitals --host localhost --database mydb
+
+Docs: https://pgvitals.github.io/
+"""
+
 
 # ── Resolve SQL directory ──────────────────────────────────────────────────────
 
@@ -50,7 +85,8 @@ def _init() -> int:
 
     print(f"Downloading pgvitals SQL files to {dest} ...")
     try:
-        with urllib.request.urlopen(GITHUB_API, timeout=15) as resp:
+        req = urllib.request.Request(GITHUB_API, headers={"User-Agent": f"pgvitals/{__version__}"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
             files = json.loads(resp.read())
     except Exception as exc:
         print(f"Error: could not fetch file list from GitHub — {exc}", file=sys.stderr)
@@ -75,10 +111,8 @@ def _init() -> int:
         return 1
 
     print(f"\n{count} SQL files installed.")
-    print(f"\nRun the diagnostic suite:")
-    print(f"  pgvitals --host localhost --database mydb --user postgres")
-    print(f"\nOr run the health score only:")
-    print(f"  psql -d mydb -f {dest.parent.parent / 'health_score.sql'}")
+    print(f"\nRun diagnostics:")
+    print(f"  pgvitals --host localhost --database mydb")
     return 0
 
 
@@ -87,13 +121,17 @@ def _init() -> int:
 def main() -> int:
     args = sys.argv[1:]
 
-    # Handle `pgvitals init` before the runner parses args
+    # Sub-commands handled before runner delegation
     if args and args[0] == "init":
         return _init()
 
-    if args and args[0] in ("-h", "--help") and len(args) == 1:
-        # Let the runner print its full help
-        pass
+    if not args or args[0] in ("-h", "--help"):
+        print(_HELP)
+        return 0
+
+    if args[0] in ("-V", "--version"):
+        print(f"pgvitals {__version__}")
+        return 0
 
     # Inject --sql-dir if the runner won't find it on its own
     if "--sql-dir" not in args:
@@ -103,21 +141,23 @@ def main() -> int:
         else:
             print(
                 "pgvitals: SQL files not found.\n"
-                "Run `pgvitals init` to download them, or pass --sql-dir <path>.",
+                "Run `pgvitals init` to download them, or pass --sql-dir <path>.\n"
+                "Docs: https://pgvitals.github.io/",
                 file=sys.stderr,
             )
             return 1
 
-    # Locate the runner script (works in both installed and dev layouts)
+    # Locate the runner (dev layout or bundled)
     candidates = [
         Path(__file__).parent.parent / "runner" / "run_diagnostics.py",  # dev
-        Path(__file__).parent / "_runner.py",                             # bundled
+        Path(__file__).parent / "_runner.py",                             # bundled copy
     ]
     runner_path = next((p for p in candidates if p.exists()), None)
     if runner_path is None:
         print(
-            "pgvitals: cannot locate the runner script.\n"
-            "Try reinstalling: pip install --force-reinstall pgvitals",
+            "pgvitals: runner script not found.\n"
+            "If installed via pip, the runner is bundled — try reinstalling:\n"
+            "  pip install --force-reinstall pgvitals",
             file=sys.stderr,
         )
         return 1

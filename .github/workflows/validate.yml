@@ -163,4 +163,14 @@ jobs:
           pip install build
           python -m build --wheel
           pip install dist/*.whl
+
+      - name: Verify package installs correctly
+        run: |
+          # Package import and version string
+          python -c "import pgvitals; print('pgvitals', pgvitals.__version__)"
+
+          # Entry point is wired up and help exits 0
           pgvitals --help
+          pgvitals --version
+
+          echo "Smoke test passed"

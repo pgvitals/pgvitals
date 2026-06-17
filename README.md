@@ -72,6 +72,7 @@ GRANT pg_monitor TO your_user;   -- PostgreSQL 10+
 | **Replication** | 23–25 | Streaming lag · logical slot lag · WAL retention |
 | **Risk signals** | 26–28, 35 | XID wraparound · MultiXact wraparound · sequence exhaustion · prepared transactions |
 | **Config & health** | 29–32, 33, 36 | GUC review · buffer cache · checkpoint pressure · DB summary · WAL rate · I/O stats |
+| **Extensions & schema** | 37–40 | Installed extensions · foreign data wrappers · function performance · schema size breakdown |
 
 ---
 
@@ -298,6 +299,18 @@ Reports are written to `runner/reports/` with auto-generated filenames and inclu
 
 </details>
 
+<details>
+<summary><b>Extensions & Schema (37–40)</b></summary>
+
+| # | File | What it catches | Threshold |
+|---|------|-----------------|-----------|
+| 37 | `sql/37_extension_inventory.sql` | Stale extensions, ones in `public` schema | `installed_version != default_version` |
+| 38 | `sql/38_foreign_data_wrappers.sql` | FDW servers, user mappings, foreign tables | Unrecognised remotes / broken mappings |
+| 39 | `sql/39_function_performance.sql` | Slow PL/pgSQL functions & procedures | High `self_time` ratio (needs `track_functions`) |
+| 40 | `sql/40_schema_size_breakdown.sql` | Storage consumed per schema | Unexpected schema growth |
+
+</details>
+
 ---
 
 ## Health Score
@@ -384,7 +397,9 @@ pgvitals/
 | Feature | Requirement |
 |---------|-------------|
 | Core queries | PostgreSQL 12+ |
-| JIT stats (section 05) | PostgreSQL 14+ |
+| JIT stats (section 05) | PostgreSQL 15+ (JIT counters added to `pg_stat_statements` in PG 15) |
+| WAL generation (section 33) | PostgreSQL 14+ (`pg_stat_wal`) |
+| I/O statistics (section 36) | PostgreSQL 16+ (`pg_stat_io`) |
 | `pg_stat_statements` | Required (in `shared_preload_libraries`) |
 | `pgstattuple` | Optional — enables precise bloat figures |
 | Privileges | `pg_monitor` role or superuser |

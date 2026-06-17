@@ -17,6 +17,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Multi-version CI matrix: every section is executed against PostgreSQL 13–17 on each push
 - `-- Min-PG:` machine-readable version-gate header on version-specific sections (05, 33, 36)
 - README "Safety — Read-Only by Design" section documenting the CI-enforced read-only guarantee
+- `--format html` — self-contained, shareable single-file HTML report with a 0–100 health-score
+  gauge, color-coded collapsible section cards, and a Print/Save-PDF button (no external assets)
 
 ### Changed
 - Documented core-compatibility floor corrected to PostgreSQL 13 (was 12); `pg_stat_statements`

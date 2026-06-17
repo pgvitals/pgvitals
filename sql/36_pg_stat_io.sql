@@ -7,6 +7,7 @@
 -- Action  : Increase work_mem if temp relation I/O is high; increase shared_buffers
 --           if evictions are high; tune checkpointer if writes dominate backends
 -- Requires: PostgreSQL 16+, track_io_timing = on (optional for timings)
+-- Min-PG  : 16
 -- ============================================================
 
 SELECT

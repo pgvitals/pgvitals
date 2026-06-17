@@ -60,11 +60,15 @@ jobs:
           echo "Section count OK: $SQL_COUNT contiguous files"
 
   syntax:
-    name: SQL syntax check (PostgreSQL 16)
+    name: SQL syntax (PG ${{ matrix.pg }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pg: ['13', '14', '15', '16', '17']
     services:
       postgres:
-        image: postgres:16
+        image: postgres:${{ matrix.pg }}
         env:
           POSTGRES_PASSWORD: pgvitals
           POSTGRES_DB: pgvitals_test
@@ -88,8 +92,8 @@ jobs:
         run: |
           psql -h localhost -U postgres -d pgvitals_test \
             -c "ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements';"
-          docker restart $(docker ps -q --filter ancestor=postgres:16)
-          for i in {1..10}; do
+          docker restart "$(docker ps -q --filter ancestor=postgres:${{ matrix.pg }})"
+          for i in {1..20}; do
             if pg_isready -h localhost -U postgres; then
               break
             fi
@@ -98,17 +102,26 @@ jobs:
           psql -h localhost -U postgres -d pgvitals_test \
             -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"
 
-      - name: Syntax-check all sql/ sections
+      - name: Syntax-check all sql/ sections (respecting Min-PG)
         env:
           PGPASSWORD: pgvitals
+          PGV: ${{ matrix.pg }}
         run: |
           FAILED=0
           for f in sql/[0-9]*.sql; do
+            # Sections may declare a minimum server version via "-- Min-PG: NN".
+            # Default floor is 13 (pg_stat_statements renamed timing columns in PG13).
+            MIN=$(grep -oiE '^--[[:space:]]*Min-PG[[:space:]]*:[[:space:]]*[0-9]+' "$f" | grep -oE '[0-9]+$' || true)
+            MIN=${MIN:-13}
+            if [ "$PGV" -lt "$MIN" ]; then
+              echo "SKIP (needs PG$MIN): $f"
+              continue
+            fi
             if ! psql -h localhost -U postgres -d pgvitals_test \
                  --set ON_ERROR_STOP=on \
                  -c "\set QUIET on" \
                  -f "$f" > /dev/null 2>&1; then
-              echo "::error file=$f::Parse error in $f"
+              echo "::error file=$f::Parse/run error in $f on PG$PGV"
               psql -h localhost -U postgres -d pgvitals_test -f "$f" 2>&1 | tail -5
               FAILED=1
             else

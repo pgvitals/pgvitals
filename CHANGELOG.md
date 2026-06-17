@@ -13,6 +13,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `39_function_performance.sql` — PL/pgSQL and stored procedure execution stats (requires `track_functions`)
 - `40_schema_size_breakdown.sql` — storage by schema with table / index / TOAST breakdown
 - Dynamic CI section-count check: validates contiguous file numbering instead of a hardcoded count
+- `ROADMAP.md` — phased plan for upcoming work
+- Multi-version CI matrix: every section is executed against PostgreSQL 13–17 on each push
+- `-- Min-PG:` machine-readable version-gate header on version-specific sections (05, 33, 36)
+- README "Safety — Read-Only by Design" section documenting the CI-enforced read-only guarantee
+
+### Changed
+- Documented core-compatibility floor corrected to PostgreSQL 13 (was 12); `pg_stat_statements`
+  renamed `total_time` → `total_exec_time` in PG 13, which sections 01/02/04/05 rely on
+
+### Fixed
+- `05_jit_overhead.sql` required version corrected to PG 15+ (JIT counters were added to
+  `pg_stat_statements` in PG 15, not 11)
+- README compatibility table: WAL generation (§33) and `pg_stat_io` (§36) version requirements
+- README documented previously-missing sections 37–40
 
 ---
 

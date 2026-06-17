@@ -395,6 +395,23 @@ The health score runs on every push and on a weekly schedule. Results appear in 
 
 See the full template: [`.github/workflows/pgvitals-healthcheck.yml`](.github/workflows/pgvitals-healthcheck.yml)
 
+### As a reusable Action
+
+Prefer a one-liner over copying a template? Use the composite action directly — it runs the health score, posts it to the job summary, exposes `score`/`grade` outputs, and fails the job below a threshold:
+
+```yaml
+- name: PostgreSQL health check
+  uses: pgvitals/pgvitals@v1
+  with:
+    host: ${{ secrets.PGHOST }}
+    database: ${{ secrets.PGDATABASE }}
+    user: ${{ secrets.PGUSER }}
+    password: ${{ secrets.PGPASSWORD }}
+    fail-under: '60'      # fail the job if score < 60 (set 0 to never fail)
+```
+
+Inputs: `host` (required), `database` (required), `user` (required), `password`, `port` (default `5432`), `sslmode` (default `prefer`), `fail-under` (default `60`). Outputs: `score`, `grade`.
+
 ### Health badge
 
 The workflow also generates a self-contained SVG badge (e.g. `postgres health: B · 87`), coloured by grade — no shields.io or third-party service. It's uploaded as a build artifact; to show it in your README, uncomment the *Publish badge to `badges` branch* step in the template and embed:

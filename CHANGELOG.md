@@ -23,6 +23,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   diagnostics; published by a new `docker.yml` workflow
 - `runner/make_badge.py` — dependency-free SVG health badge generator, wired into the
   healthcheck workflow (uploaded as an artifact; optional publish-to-`badges`-branch step)
+- `--explain` — optional AI analysis of findings via the Anthropic API (stdlib `urllib`,
+  no SDK); embeds a prioritized, plain-English action plan at the top of the Markdown/HTML
+  report. Opt-in, requires `ANTHROPIC_API_KEY`, never breaks a run on failure
 
 ### Fixed (healthcheck workflow)
 - Score/grade extraction now matches `NN / 100` anywhere on the line, so it works with

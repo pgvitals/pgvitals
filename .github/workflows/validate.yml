@@ -187,3 +187,6 @@ jobs:
           pgvitals --version
 
           echo "Smoke test passed"
+
+      - name: Explain module self-test (offline)
+        run: python runner/explain.py --selftest

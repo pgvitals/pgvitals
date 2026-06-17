@@ -6,7 +6,8 @@
 --           high fpi_pct (> 20%) indicating potential checkpoint pressure
 -- Action  : Enable wal_compression; tune max_wal_size and checkpoint_timeout;
 --           investigate write-heavy queries or large updates
--- Requires: PostgreSQL 14+
+-- Requires: PostgreSQL 14+ (pg_stat_wal)
+-- Min-PG  : 14
 -- ============================================================
 
 SELECT

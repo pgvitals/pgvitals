@@ -5,7 +5,8 @@
 **40 copy-paste PostgreSQL diagnostic queries — one for every performance bottleneck.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14%2B-blue?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-13%E2%80%9317-blue?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Validate](https://github.com/pgvitals/pgvitals/actions/workflows/validate.yml/badge.svg)](https://github.com/pgvitals/pgvitals/actions/workflows/validate.yml)
 [![PyPI](https://img.shields.io/pypi/v/pgvitals?color=blue)](https://pypi.org/project/pgvitals/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -396,13 +397,33 @@ pgvitals/
 
 | Feature | Requirement |
 |---------|-------------|
-| Core queries | PostgreSQL 12+ |
+| Core queries | PostgreSQL 13+ (`pg_stat_statements` renamed `total_time` → `total_exec_time` in PG 13) |
 | JIT stats (section 05) | PostgreSQL 15+ (JIT counters added to `pg_stat_statements` in PG 15) |
 | WAL generation (section 33) | PostgreSQL 14+ (`pg_stat_wal`) |
 | I/O statistics (section 36) | PostgreSQL 16+ (`pg_stat_io`) |
 | `pg_stat_statements` | Required (in `shared_preload_libraries`) |
 | `pgstattuple` | Optional — enables precise bloat figures |
 | Privileges | `pg_monitor` role or superuser |
+
+---
+
+## Safety — Read-Only by Design
+
+Every query in `sql/` (and `master.sql`, `health_score.sql`) is **read-only**: plain
+`SELECT`s against system catalogs and statistics views. There is no
+`INSERT`/`UPDATE`/`DELETE`/DDL, no table locks beyond the momentary `AccessShareLock`
+any `SELECT` takes, and nothing that blocks your workload — safe to run on production
+during an incident.
+
+This is **enforced in CI**, not just promised:
+
+- The build fails if any section file contains a DML/DDL keyword.
+- Every section is executed against **PostgreSQL 13 – 17** on each push (version-gated
+  sections are skipped only where the underlying view doesn't exist yet).
+
+The only components that write are opt-in and clearly separated: `monitoring/` creates a
+dedicated `perf_monitor` schema for load-test snapshots, which you install explicitly and
+remove with `DROP SCHEMA perf_monitor CASCADE`.
 
 ---
 

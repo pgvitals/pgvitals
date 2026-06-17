@@ -5,7 +5,8 @@
 -- Look for: total_jit_ms close to or greater than mean_exec_ms
 -- Action  : SET jit = off for the session; raise jit_above_cost
 --           in postgresql.conf; or restructure the query
--- Requires: pg_stat_statements, PostgreSQL 11+
+-- Requires: pg_stat_statements, PostgreSQL 15+ (JIT counters were
+--           added to pg_stat_statements in PG 15)
 -- ============================================================
 
 SELECT

@@ -7,6 +7,9 @@ Thumbs.db
 .idea/
 *.swp
 
+# Crash dumps
+*.stackdump
+
 # Runner — credentials & generated reports
 runner/pgvitals.conf
 runner/reports/

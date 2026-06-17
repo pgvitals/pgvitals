@@ -30,10 +30,11 @@ Status legend: ⬜ not started · 🚧 in progress · ✅ done
 - ✅ **Health badge** — dependency-free SVG generator (`runner/make_badge.py`) wired into the healthcheck workflow; embeddable from a `badges` branch.
 - ✅ **Docker one-liner** — `docker run --rm ghcr.io/pgvitals/pgvitals --host … --database …`, published by `docker.yml`.
 
-## Phase 3 — The AI Differentiator
+## Phase 3 — The AI Differentiator ✅
 *Headline feature; nothing in the comparison table does this.*
 
-- ⬜ **`pgvitals --explain`** — send diagnostic output to Claude for a prioritized, plain-English "what's wrong → fix in this order" narrative. Optional tool-use loop to request follow-up sections.
+- ✅ **`pgvitals --explain`** — sends findings to Claude (stdlib `urllib`, no SDK) for a prioritized, plain-English "what's wrong → fix in this order" narrative, embedded in the Markdown/HTML report. Opt-in, requires `ANTHROPIC_API_KEY`, never breaks a run on failure.
+  - *Future:* optional tool-use loop so the model can request follow-up sections; pull the MCP server (Phase 6) forward to ride the same channel.
 
 ## Phase 4 — Distribution at Scale
 *Once the experience is polished.*

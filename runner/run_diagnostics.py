@@ -357,6 +357,7 @@ def generate_report(
     results: list[dict],
     cfg: dict,
     pg_version: str,
+    ai_analysis: str | None = None,
 ) -> str:
     """Generate the full Markdown report from query results."""
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -371,6 +372,15 @@ def generate_report(
     lines.append(f"> **Report Generated**: {now}  ")
     lines.append(f"> **Sections Executed**: {len(results)}")
     lines.append("")
+
+    # ── AI Analysis (optional) ──────────────────────────────────────
+    if ai_analysis:
+        lines.append("## 🧠 AI Analysis")
+        lines.append("")
+        lines.append(ai_analysis)
+        lines.append("")
+        lines.append("---")
+        lines.append("")
 
     # ── Summary Table ───────────────────────────────────────────────
     lines.append("## 📋 Executive Summary")
@@ -587,6 +597,17 @@ pre { background:#0f172a; color:#e2e8f0; border-radius:10px; padding:14px 16px;
           border-radius:10px; padding:12px 14px; margin-top:10px; font-size:13px; }
 .note { color:var(--muted); font-size:13px; margin-top:8px; }
 .recs li { margin:5px 0; }
+.ai { background:linear-gradient(180deg,#faf5ff,#fff); border:1px solid #e9d5ff;
+      border-radius:14px; padding:18px 22px; margin-bottom:24px; }
+.ai-head { font-weight:700; color:#7c3aed; font-size:15px; margin-bottom:8px; }
+.ai-body { font-size:14px; }
+.ai-body h3, .ai-body h4 { font-size:14px; margin:14px 0 6px; color:#0f172a; }
+.ai-body p { margin:8px 0; }
+.ai-body ul, .ai-body ol { margin:8px 0 8px 22px; }
+.ai-body li { margin:4px 0; }
+.ai-body code { background:#f1f5f9; padding:1px 6px; border-radius:5px;
+      font:12.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+.ai-body pre { background:#0f172a; color:#e2e8f0; }
 footer { color:var(--muted); font-size:12px; text-align:center; margin-top:40px; }
 @media print { body{background:#fff;} .toolbar{display:none;}
                details.section{open:true;} .banner{-webkit-print-color-adjust:exact;} }
@@ -607,7 +628,84 @@ def _status_class(badge: str) -> str:
     return "error"
 
 
-def generate_html_report(results: list[dict], cfg: dict, pg_version: str) -> str:
+def _md_to_html_min(md: str) -> str:
+    """Tiny, safe Markdown→HTML for the AI analysis block.
+
+    HTML-escapes first, then applies a small, fixed set of transforms
+    (headings, bullet/numbered lists, bold, inline + fenced code). Anything
+    not recognized is rendered as a paragraph — no arbitrary HTML passes through.
+    """
+    import re as _re
+    esc = html.escape
+    out: list[str] = []
+    list_type: str | None = None        # 'ul' | 'ol' | None
+    in_code = False
+    code_buf: list[str] = []
+
+    def close_list() -> None:
+        nonlocal list_type
+        if list_type:
+            out.append(f"</{list_type}>")
+            list_type = None
+
+    def inline(s: str) -> str:
+        s = esc(s)
+        s = _re.sub(r"`([^`]+)`", r"<code>\1</code>", s)
+        s = _re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", s)
+        return s
+
+    for raw in md.splitlines():
+        line = raw.rstrip()
+
+        if line.strip().startswith("```"):
+            if in_code:
+                out.append("<pre>" + esc("\n".join(code_buf)) + "</pre>")
+                code_buf = []
+                in_code = False
+            else:
+                close_list()
+                in_code = True
+            continue
+        if in_code:
+            code_buf.append(raw)
+            continue
+
+        if not line.strip():
+            close_list()
+            continue
+
+        m = _re.match(r"^(#{1,6})\s+(.*)$", line)
+        if m:
+            close_list()
+            level = min(max(len(m.group(1)), 3), 6)   # floor at h3 so it stays under the card title
+            out.append(f"<h{level}>{inline(m.group(2))}</h{level}>")
+            continue
+
+        m = _re.match(r"^\s*[-*]\s+(.*)$", line)
+        if m:
+            if list_type != "ul":
+                close_list(); out.append("<ul>"); list_type = "ul"
+            out.append(f"<li>{inline(m.group(1))}</li>")
+            continue
+
+        m = _re.match(r"^\s*\d+[.)]\s+(.*)$", line)
+        if m:
+            if list_type != "ol":
+                close_list(); out.append("<ol>"); list_type = "ol"
+            out.append(f"<li>{inline(m.group(1))}</li>")
+            continue
+
+        close_list()
+        out.append(f"<p>{inline(line)}</p>")
+
+    if in_code:
+        out.append("<pre>" + esc("\n".join(code_buf)) + "</pre>")
+    close_list()
+    return "\n".join(out)
+
+
+def generate_html_report(results: list[dict], cfg: dict, pg_version: str,
+                         ai_analysis: str | None = None) -> str:
     """Render a single self-contained HTML report (no external assets)."""
     esc = html.escape
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -665,6 +763,11 @@ def generate_html_report(results: list[dict], cfg: dict, pg_version: str) -> str
     out.append(f'<span class="pill"><span class="dot data"></span>{data_count} With findings</span>')
     out.append(f'<span class="pill"><span class="dot error"></span>{error_count} Unavailable</span>')
     out.append('</div></div></div>')
+
+    # ── AI analysis (optional) ──
+    if ai_analysis:
+        out.append('<div class="ai"><div class="ai-head">🧠 AI Analysis</div>')
+        out.append('<div class="ai-body">' + _md_to_html_min(ai_analysis) + '</div></div>')
 
     # ── Area breakdown ──
     areas: dict[str, dict[str, int]] = {}
@@ -792,6 +895,9 @@ Examples:
     g3.add_argument("--format", choices=["markdown", "html"],
                     help="Report format (default: markdown)")
     g3.add_argument("--no-raw", action="store_true", help="Omit raw query output from report")
+    g3.add_argument("--explain", action="store_true",
+                    help="Add an AI analysis of the findings (requires ANTHROPIC_API_KEY)")
+    g3.add_argument("--explain-model", help="Model for --explain (default: claude-sonnet-4-6)")
 
     return p.parse_args()
 
@@ -925,12 +1031,32 @@ def main() -> int:
     print()  # newline after progress bar
     print()
 
+    # ── Optional AI analysis ────────────────────────────────────────
+    ai_analysis = None
+    if args.explain:
+        sys.path.insert(0, str(SCRIPT_DIR))
+        try:
+            from explain import explain as _run_explain
+        except Exception as e:  # noqa: BLE001
+            print(f"⚠  --explain unavailable: could not load explain module ({e})")
+            _run_explain = None
+        if _run_explain:
+            if not os.environ.get("ANTHROPIC_API_KEY"):
+                print("⚠  --explain requested but ANTHROPIC_API_KEY is not set — skipping AI analysis.")
+            else:
+                print("🧠 Generating AI analysis...", end=" ", flush=True)
+                ai_analysis = _run_explain(results, cfg, pg_version,
+                                           model=args.explain_model,
+                                           section_meta=SECTION_META)
+                print("done" if ai_analysis else "skipped")
+                print()
+
     # ── Generate report ─────────────────────────────────────────────
     fmt = cfg.get("format", "markdown")
     if fmt == "html":
-        report = generate_html_report(results, cfg, pg_version)
+        report = generate_html_report(results, cfg, pg_version, ai_analysis)
     else:
-        report = generate_report(results, cfg, pg_version)
+        report = generate_report(results, cfg, pg_version, ai_analysis)
 
     # ── Determine output path ───────────────────────────────────────
     if args.output:

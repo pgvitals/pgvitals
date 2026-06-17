@@ -22,6 +22,7 @@
     "report": {
         "output_dir": "./reports",
         "format": "markdown",
+        "_format_options": "markdown | html (html = self-contained, shareable single file)",
         "include_raw_output": true,
         "truncate_rows": 60,
         "filename_template": "pgvitals_{database}_{timestamp}.md"

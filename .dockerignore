@@ -1,0 +1,14 @@
+.git
+.github
+.agents
+**/__pycache__
+*.pyc
+runner/reports
+runner/pgvitals.conf
+*.stackdump
+dist
+build
+*.egg-info
+docs
+.vscode
+.idea

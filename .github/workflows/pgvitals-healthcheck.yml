@@ -89,12 +89,21 @@ jobs:
 
           echo "$OUTPUT"
 
-          # Extract score line for the step summary
-          SCORE_LINE=$(echo "$OUTPUT" | grep -E '^\s*[0-9]+ / 100' | head -1 | xargs)
-          GRADE=$(echo "$OUTPUT" | grep -E '^\s*[ABCDFabcdf]\s*\|' | head -1 | awk -F'|' '{print $2}' | xargs)
+          # Extract the score — match "NN / 100" anywhere on the line so it
+          # works regardless of psql's box-drawing borders (║ │) or alignment.
+          SCORE=$(echo "$OUTPUT" | grep -oE '[0-9]+ / 100' | head -1 | grep -oE '^[0-9]+')
+          [ -z "$SCORE" ] && SCORE=0
 
-          echo "score_line=$SCORE_LINE" >> "$GITHUB_OUTPUT"
-          echo "grade=$GRADE"          >> "$GITHUB_OUTPUT"
+          # Derive the grade from the score (same thresholds as health_score.sql).
+          if   [ "$SCORE" -ge 90 ]; then GRADE=A
+          elif [ "$SCORE" -ge 75 ]; then GRADE=B
+          elif [ "$SCORE" -ge 60 ]; then GRADE=C
+          elif [ "$SCORE" -ge 40 ]; then GRADE=D
+          else                           GRADE=F
+          fi
+
+          echo "score=$SCORE" >> "$GITHUB_OUTPUT"
+          echo "grade=$GRADE" >> "$GITHUB_OUTPUT"
 
           # Write to job summary
           {
@@ -106,6 +115,54 @@ jobs:
             echo ""
             echo "_Run against \`${PGDATABASE}\` on \`${PGHOST}\`_"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Generate health badge
+        if: always()
+        run: |
+          SCORE="${{ steps.health.outputs.score }}"
+          GRADE="${{ steps.health.outputs.grade }}"
+          [ -z "$SCORE" ] && SCORE=0
+          [ -z "$GRADE" ] && GRADE=F
+
+          # Use the bundled generator, or fetch it if running from a copied workflow.
+          if [ -f runner/make_badge.py ]; then
+            SCRIPT=runner/make_badge.py
+          else
+            curl -sSL https://raw.githubusercontent.com/pgvitals/pgvitals/master/runner/make_badge.py -o make_badge.py
+            SCRIPT=make_badge.py
+          fi
+          python "$SCRIPT" --score "$SCORE" --grade "$GRADE" --out pgvitals-badge.svg
+
+          {
+            echo ""
+            echo "**Badge generated** — download the \`pgvitals-badge\` artifact below."
+            echo "To embed it, publish \`pgvitals-badge.svg\` (e.g. to a \`badges\` branch) and reference its raw URL."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload badge artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pgvitals-badge
+          path: pgvitals-badge.svg
+          if-no-files-found: warn
+
+      # ── Optional: publish the badge to a `badges` branch so a README can ──
+      # ── embed it at a stable URL. Uncomment and ensure the workflow has   ──
+      # ── `permissions: contents: write`.                                   ──
+      #
+      # - name: Publish badge to `badges` branch
+      #   if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      #   run: |
+      #     git config user.name  "github-actions[bot]"
+      #     git config user.email "github-actions[bot]@users.noreply.github.com"
+      #     git checkout --orphan badges
+      #     git rm -rf --cached . >/dev/null 2>&1 || true
+      #     git add -f pgvitals-badge.svg
+      #     git commit -m "Update pgvitals health badge"
+      #     git push -f origin badges
+      #   # Embed with:
+      #   # ![pgvitals](https://raw.githubusercontent.com/<owner>/<repo>/badges/pgvitals-badge.svg)
 
       - name: Fail if grade is D or F
         run: |

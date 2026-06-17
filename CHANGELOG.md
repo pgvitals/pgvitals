@@ -19,6 +19,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - README "Safety — Read-Only by Design" section documenting the CI-enforced read-only guarantee
 - `--format html` — self-contained, shareable single-file HTML report with a 0–100 health-score
   gauge, color-coded collapsible section cards, and a Print/Save-PDF button (no external assets)
+- Docker image (`ghcr.io/pgvitals/pgvitals`) bundling the SQL sections + `psql` — zero-install
+  diagnostics; published by a new `docker.yml` workflow
+- `runner/make_badge.py` — dependency-free SVG health badge generator, wired into the
+  healthcheck workflow (uploaded as an artifact; optional publish-to-`badges`-branch step)
+
+### Fixed (healthcheck workflow)
+- Score/grade extraction now matches `NN / 100` anywhere on the line, so it works with
+  `health_score.sql`'s box-drawing (`║ │`) output; grade is derived from the score
 
 ### Changed
 - Documented core-compatibility floor corrected to PostgreSQL 13 (was 12); `pg_stat_statements`

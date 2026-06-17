@@ -7,6 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-13%E2%80%9317-blue?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Validate](https://github.com/pgvitals/pgvitals/actions/workflows/validate.yml/badge.svg)](https://github.com/pgvitals/pgvitals/actions/workflows/validate.yml)
+[![Docker](https://img.shields.io/badge/ghcr.io-pgvitals-2496ED?logo=docker&logoColor=white)](https://github.com/pgvitals/pgvitals/pkgs/container/pgvitals)
 [![PyPI](https://img.shields.io/pypi/v/pgvitals?color=blue)](https://pypi.org/project/pgvitals/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -169,6 +170,21 @@ python run_diagnostics.py --profile staging
 
 # Override connection via CLI
 python run_diagnostics.py --host db.example.com -U monitor -d production
+```
+
+### Via Docker (no install)
+
+The image bundles the SQL sections and `psql` — nothing to install but Docker:
+
+```bash
+# Full diagnostic run
+docker run --rm -e PGPASSWORD=secret ghcr.io/pgvitals/pgvitals \
+  --host db.example.com --user dba --database prod
+
+# Save a self-contained HTML report to the current directory
+docker run --rm -e PGPASSWORD=secret -v "$PWD:/out" ghcr.io/pgvitals/pgvitals \
+  --host db.example.com --user dba --database prod \
+  --format html --output /out/report.html
 ```
 
 ### Configuration
@@ -364,6 +380,16 @@ cp .github/workflows/pgvitals-healthcheck.yml path/to/your-repo/.github/workflow
 The health score runs on every push and on a weekly schedule. Results appear in the Actions job summary. The job fails if the grade drops to D or F.
 
 See the full template: [`.github/workflows/pgvitals-healthcheck.yml`](.github/workflows/pgvitals-healthcheck.yml)
+
+### Health badge
+
+The workflow also generates a self-contained SVG badge (e.g. `postgres health: B · 87`), coloured by grade — no shields.io or third-party service. It's uploaded as a build artifact; to show it in your README, uncomment the *Publish badge to `badges` branch* step in the template and embed:
+
+```markdown
+![pgvitals](https://raw.githubusercontent.com/<owner>/<repo>/badges/pgvitals-badge.svg)
+```
+
+Generate one locally too: `python runner/make_badge.py --score 87 --grade B --out badge.svg`
 
 ---
 

@@ -1,0 +1,106 @@
+name: 'pgvitals Health Check'
+description: 'Run a 0-100 PostgreSQL health score in CI and fail the build if it drops too low.'
+author: 'pgvitals'
+
+branding:
+  icon: 'activity'
+  color: 'blue'
+
+inputs:
+  host:
+    description: 'Database host'
+    required: true
+  port:
+    description: 'Database port'
+    required: false
+    default: '5432'
+  database:
+    description: 'Database name'
+    required: true
+  user:
+    description: 'Database user'
+    required: true
+  password:
+    description: 'Database password (pass via a secret, e.g. ${{ secrets.PGPASSWORD }})'
+    required: false
+    default: ''
+  sslmode:
+    description: 'libpq sslmode (disable, prefer, require, verify-full, ...)'
+    required: false
+    default: 'prefer'
+  fail-under:
+    description: 'Fail the job if the score is below this value (0-100). Set to 0 to never fail.'
+    required: false
+    default: '60'
+
+outputs:
+  score:
+    description: '0-100 health score'
+    value: ${{ steps.run.outputs.score }}
+  grade:
+    description: 'Letter grade A-F'
+    value: ${{ steps.run.outputs.grade }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Ensure psql is available
+      shell: bash
+      run: |
+        if ! command -v psql >/dev/null 2>&1; then
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+        fi
+
+    - name: Run pgvitals health score
+      id: run
+      shell: bash
+      env:
+        PGPASSWORD: ${{ inputs.password }}
+        PGSSLMODE: ${{ inputs.sslmode }}
+      run: |
+        OUT=$(psql -h "${{ inputs.host }}" -p "${{ inputs.port }}" \
+              -U "${{ inputs.user }}" -d "${{ inputs.database }}" \
+              -f "$GITHUB_ACTION_PATH/health_score.sql" 2>&1) || true
+        echo "$OUT"
+
+        # Match "NN / 100" anywhere on the line (psql draws box borders ║ │).
+        SCORE=$(echo "$OUT" | grep -oE '[0-9]+ / 100' | head -1 | grep -oE '^[0-9]+')
+        if [ -z "$SCORE" ]; then
+          echo "::error::pgvitals could not compute a health score (connection or permissions issue?)"
+          exit 1
+        fi
+
+        if   [ "$SCORE" -ge 90 ]; then GRADE=A
+        elif [ "$SCORE" -ge 75 ]; then GRADE=B
+        elif [ "$SCORE" -ge 60 ]; then GRADE=C
+        elif [ "$SCORE" -ge 40 ]; then GRADE=D
+        else                           GRADE=F
+        fi
+
+        echo "score=$SCORE" >> "$GITHUB_OUTPUT"
+        echo "grade=$GRADE" >> "$GITHUB_OUTPUT"
+
+        {
+          echo "## 🩺 pgvitals Health Check"
+          echo ""
+          echo "**Score: ${SCORE} / 100 — Grade ${GRADE}**"
+          echo ""
+          echo '```'
+          echo "$OUT"
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
+
+        # Best-effort badge (won't fail the run)
+        python3 "$GITHUB_ACTION_PATH/runner/make_badge.py" \
+          --score "$SCORE" --grade "$GRADE" --out pgvitals-badge.svg 2>/dev/null || true
+
+    - name: Enforce threshold
+      shell: bash
+      run: |
+        SCORE="${{ steps.run.outputs.score }}"
+        MIN="${{ inputs.fail-under }}"
+        if [ "$MIN" -gt 0 ] && [ "$SCORE" -lt "$MIN" ]; then
+          echo "::error::pgvitals score ${SCORE} is below the threshold ${MIN} (grade ${{ steps.run.outputs.grade }})"
+          exit 1
+        fi
+        echo "pgvitals score ${SCORE} (grade ${{ steps.run.outputs.grade }}) meets the threshold (>= ${MIN})."

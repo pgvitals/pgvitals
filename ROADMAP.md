@@ -40,7 +40,7 @@ Status legend: ⬜ not started · 🚧 in progress · ✅ done
 *Once the experience is polished.*
 
 - ⬜ **Programmatic SEO** — one landing page per diagnostic section, each embedding an example report.
-- ⬜ **GitHub Action in Marketplace** — formalize the health-check template as a listed action.
+- ✅ **GitHub Action in Marketplace** — composite `action.yml` (`uses: pgvitals/pgvitals@v1`) with inputs/outputs, badge, and `fail-under` gate. *(Publishing the listing is a one-click step on a tagged release.)*
 - ⬜ **Coordinated launch** — Show HN, r/PostgreSQL, `awesome-postgres` PRs, Homebrew formula.
 
 ## Phase 5 — Stickiness / Retention

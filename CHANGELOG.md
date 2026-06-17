@@ -26,6 +26,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `--explain` — optional AI analysis of findings via the Anthropic API (stdlib `urllib`,
   no SDK); embeds a prioritized, plain-English action plan at the top of the Markdown/HTML
   report. Opt-in, requires `ANTHROPIC_API_KEY`, never breaks a run on failure
+- `action.yml` — reusable composite GitHub Action (`uses: pgvitals/pgvitals@v1`) that runs
+  the health score, posts it to the job summary, exposes `score`/`grade` outputs, generates
+  a badge, and fails the job below a configurable `fail-under` threshold
 
 ### Fixed (healthcheck workflow)
 - Score/grade extraction now matches `NN / 100` anywhere on the line, so it works with

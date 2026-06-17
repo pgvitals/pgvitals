@@ -150,6 +150,7 @@ pgvitals --profile staging                                  # use a named config
 pgvitals --sections 01,03,19,26,32                         # run specific sections only
 pgvitals --skip 05,36                                       # skip specific sections
 pgvitals --output ./report.md                               # custom output path
+pgvitals --format html -o report.html                       # self-contained shareable HTML report
 ```
 
 ### Via script (no install)
@@ -189,6 +190,8 @@ Reports are written to `runner/reports/` with auto-generated filenames and inclu
 - Health score breakdown by area
 - Detailed output for every section
 - Prioritized recommendations (critical → medium → info)
+
+Pass `--format html` for a **self-contained, shareable HTML report** — a single file (inline CSS/JS, no external assets, works from `file://`) with a 0–100 health-score gauge, color-coded collapsible section cards, and a one-click *Print / Save PDF* button. Markdown remains the default.
 
 > **Note**: `runner/pgvitals.conf` is gitignored to protect credentials. Never commit database passwords.
 

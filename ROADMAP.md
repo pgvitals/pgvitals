@@ -18,10 +18,10 @@ Status legend: ⬜ not started · 🚧 in progress · ✅ done
 - ✅ **Multi-version CI matrix** — every SQL section runs against PostgreSQL 13–17 in Docker on each push, with a Validate badge. Sections gate by a machine-readable `-- Min-PG:` header. (This surfaced the real compatibility floor: PG 13, not 12.)
 - ✅ **Prod-safety guarantee** — README "Safety" section documents the read-only/lock-free guarantee; CI fails on any DML/DDL keyword in `sql/`.
 
-## Phase 1 — The Core Artifact
+## Phase 1 — The Core Artifact ✅
 *The shareable unit everything else reuses.*
 
-- ⬜ **Self-contained HTML report** (`pgvitals --format html`) — health-score gauge, color-coded section cards, collapsible SQL, copy/share. Single file, works from `file://`.
+- ✅ **Self-contained HTML report** (`pgvitals --format html`) — 0–100 health-score gauge, color-coded collapsible section cards, Print/Save-PDF button. Single file, inline CSS/JS, works from `file://`.
 
 ## Phase 2 — Zero-Friction & Passive Distribution
 *All reuse the Phase 1 renderer.*

@@ -43,6 +43,7 @@ Requirements
 from __future__ import annotations
 
 import argparse
+import html
 import io
 import json
 import os
@@ -312,6 +313,42 @@ def error_analysis(stderr: str) -> str:
     return stderr.split("\n")[0][:120]
 
 
+# ── Scoring (shared by the HTML report) ─────────────────────────────
+RISK_PENALTY = {"critical": 25, "high": 15, "medium": 7, "low": 3, "info": 0}
+RISK_COLOR   = {
+    "critical": "#dc2626", "high": "#ea580c", "medium": "#d97706",
+    "low": "#16a34a", "info": "#64748b",
+}
+
+
+def compute_score(results: list[dict]) -> int:
+    """Derive a 0–100 health score from section findings.
+
+    Sections that returned data are penalized by their risk weight. Errors do
+    not penalize the score (the check was unavailable, not failed) — they are
+    surfaced separately as a coverage gap.
+    """
+    score = 100
+    for r in results:
+        if r["badge"] == "📊 Data":
+            risk = SECTION_META.get(r["num"], {}).get("risk", "info")
+            score -= RISK_PENALTY.get(risk, 0)
+    return max(0, min(100, score))
+
+
+def grade_for(score: int) -> tuple[str, str, str]:
+    """Return (letter, label, color) for a score."""
+    if score >= 90:
+        return ("A", "Excellent", "#16a34a")
+    if score >= 80:
+        return ("B", "Good", "#65a30d")
+    if score >= 70:
+        return ("C", "Fair", "#d97706")
+    if score >= 60:
+        return ("D", "Poor", "#ea580c")
+    return ("F", "Critical", "#dc2626")
+
+
 # ════════════════════════════════════════════════════════════════════
 # Report Generator
 # ════════════════════════════════════════════════════════════════════
@@ -488,6 +525,231 @@ def generate_report(
 
 
 # ════════════════════════════════════════════════════════════════════
+# HTML Report Generator (self-contained, no external dependencies)
+# ════════════════════════════════════════════════════════════════════
+
+_HTML_CSS = """
+:root { --bg:#f6f7f9; --card:#fff; --ink:#0f172a; --muted:#64748b;
+        --line:#e5e7eb; --accent:#0ea5e9; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--ink);
+       font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+.wrap { max-width:960px; margin:0 auto; padding:32px 20px 64px; }
+a { color:var(--accent); }
+.banner { background:linear-gradient(135deg,#0f172a,#1e293b); color:#fff;
+          border-radius:16px; padding:28px 32px; margin-bottom:24px; }
+.banner h1 { margin:0 0 4px; font-size:26px; letter-spacing:-0.5px; }
+.banner .sub { color:#94a3b8; font-size:13px; }
+.meta { display:flex; flex-wrap:wrap; gap:6px 28px; margin-top:16px; font-size:13px; }
+.meta b { color:#cbd5e1; font-weight:600; }
+.meta span { color:#fff; }
+.scorecard { display:flex; gap:28px; align-items:center; background:var(--card);
+             border:1px solid var(--line); border-radius:16px; padding:24px 28px; margin-bottom:24px; }
+.gauge { flex:0 0 auto; }
+.score-body { flex:1 1 auto; }
+.grade { font-size:22px; font-weight:700; }
+.score-label { color:var(--muted); margin:2px 0 14px; }
+.pills { display:flex; flex-wrap:wrap; gap:10px; }
+.pill { display:inline-flex; align-items:center; gap:7px; padding:6px 12px;
+        border-radius:999px; font-size:13px; font-weight:600; background:#f1f5f9; }
+.dot { width:9px; height:9px; border-radius:50%; display:inline-block; }
+.dot.clear{background:#16a34a;} .dot.data{background:#0ea5e9;} .dot.error{background:#94a3b8;}
+.section-title { font-size:13px; text-transform:uppercase; letter-spacing:.6px;
+                 color:var(--muted); margin:28px 0 12px; font-weight:700; }
+table.areas { width:100%; border-collapse:collapse; background:var(--card);
+              border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+table.areas th, table.areas td { padding:10px 14px; text-align:left; font-size:13px;
+              border-bottom:1px solid var(--line); }
+table.areas th { background:#f8fafc; color:var(--muted); font-weight:600; }
+table.areas td.num { text-align:right; font-variant-numeric:tabular-nums; }
+.toolbar { display:flex; gap:8px; margin:24px 0 12px; }
+.btn { border:1px solid var(--line); background:var(--card); color:var(--ink);
+       padding:7px 14px; border-radius:8px; font-size:13px; cursor:pointer; }
+.btn:hover { background:#f1f5f9; }
+details.section { background:var(--card); border:1px solid var(--line);
+                 border-radius:12px; margin-bottom:10px; overflow:hidden; }
+details.section > summary { list-style:none; cursor:pointer; padding:14px 18px;
+       display:flex; align-items:center; gap:12px; }
+details.section > summary::-webkit-details-marker { display:none; }
+.sec-num { font-variant-numeric:tabular-nums; color:var(--muted); font-weight:700;
+           font-size:13px; min-width:24px; }
+.sec-name { font-weight:600; flex:1 1 auto; }
+.risk { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.4px;
+        color:#fff; padding:3px 9px; border-radius:999px; }
+.sec-body { padding:0 18px 18px; border-top:1px solid var(--line); }
+.hdr { margin:14px 0; font-size:13.5px; }
+.hdr div { margin:3px 0; }
+.hdr b { color:var(--muted); font-weight:600; display:inline-block; min-width:74px; }
+pre { background:#0f172a; color:#e2e8f0; border-radius:10px; padding:14px 16px;
+      overflow-x:auto; font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      margin:10px 0 0; }
+.errbox { background:#fef2f2; border:1px solid #fecaca; color:#991b1b;
+          border-radius:10px; padding:12px 14px; margin-top:10px; font-size:13px; }
+.note { color:var(--muted); font-size:13px; margin-top:8px; }
+.recs li { margin:5px 0; }
+footer { color:var(--muted); font-size:12px; text-align:center; margin-top:40px; }
+@media print { body{background:#fff;} .toolbar{display:none;}
+               details.section{open:true;} .banner{-webkit-print-color-adjust:exact;} }
+"""
+
+_HTML_JS = """
+function pgvSetAll(open){
+  document.querySelectorAll('details.section').forEach(function(d){ d.open = open; });
+}
+"""
+
+
+def _status_class(badge: str) -> str:
+    if badge == "✅ Clear":
+        return "clear"
+    if badge == "📊 Data":
+        return "data"
+    return "error"
+
+
+def generate_html_report(results: list[dict], cfg: dict, pg_version: str) -> str:
+    """Render a single self-contained HTML report (no external assets)."""
+    esc = html.escape
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    truncate = cfg.get("truncate_rows", 60)
+
+    total       = len(results)
+    clear_count = sum(1 for r in results if r["badge"] == "✅ Clear")
+    data_count  = sum(1 for r in results if r["badge"] == "📊 Data")
+    error_count = sum(1 for r in results if r["badge"] == "⚠️ Error")
+
+    score = compute_score(results)
+    letter, label, gcolor = grade_for(score)
+
+    # Donut gauge geometry
+    radius = 54.0
+    circ = 2 * 3.141592653589793 * radius
+    dash = circ * score / 100.0
+
+    out: list[str] = []
+    out.append("<!DOCTYPE html>")
+    out.append('<html lang="en"><head><meta charset="utf-8">')
+    out.append('<meta name="viewport" content="width=device-width, initial-scale=1">')
+    out.append(f"<title>pgvitals report — {esc(cfg['database'])}</title>")
+    out.append(f"<style>{_HTML_CSS}</style></head><body><div class=\"wrap\">")
+
+    # ── Banner ──
+    out.append('<div class="banner">')
+    out.append('<h1>🩺 pgvitals Diagnostic Report</h1>')
+    out.append('<div class="sub">PostgreSQL health diagnostics</div>')
+    out.append('<div class="meta">')
+    out.append(f'<div><b>Database</b> <span>{esc(cfg["database"])}</span></div>')
+    out.append(f'<div><b>Host</b> <span>{esc(str(cfg["host"]))}:{esc(str(cfg["port"]))}</span></div>')
+    out.append(f'<div><b>Version</b> <span>PostgreSQL {esc(pg_version)}</span></div>')
+    out.append(f'<div><b>User</b> <span>{esc(str(cfg["user"]))}</span></div>')
+    out.append(f'<div><b>Generated</b> <span>{esc(now)}</span></div>')
+    out.append(f'<div><b>Sections</b> <span>{total}</span></div>')
+    out.append('</div></div>')
+
+    # ── Scorecard with gauge ──
+    out.append('<div class="scorecard">')
+    out.append(f'<svg class="gauge" width="120" height="120" viewBox="0 0 140 140">')
+    out.append('<circle cx="70" cy="70" r="54" fill="none" stroke="#e5e7eb" stroke-width="14"/>')
+    out.append(f'<circle cx="70" cy="70" r="54" fill="none" stroke="{gcolor}" stroke-width="14" '
+               f'stroke-linecap="round" stroke-dasharray="{dash:.1f} {circ:.1f}" '
+               f'transform="rotate(-90 70 70)"/>')
+    out.append(f'<text x="70" y="74" text-anchor="middle" font-size="34" font-weight="700" '
+               f'fill="{gcolor}" font-family="sans-serif">{score}</text>')
+    out.append('<text x="70" y="96" text-anchor="middle" font-size="12" fill="#94a3b8" '
+               'font-family="sans-serif">/ 100</text></svg>')
+    out.append('<div class="score-body">')
+    out.append(f'<div class="grade" style="color:{gcolor}">Grade {letter} — {esc(label)}</div>')
+    out.append('<div class="score-label">Derived from section findings weighted by risk</div>')
+    out.append('<div class="pills">')
+    out.append(f'<span class="pill"><span class="dot clear"></span>{clear_count} Clear</span>')
+    out.append(f'<span class="pill"><span class="dot data"></span>{data_count} With findings</span>')
+    out.append(f'<span class="pill"><span class="dot error"></span>{error_count} Unavailable</span>')
+    out.append('</div></div></div>')
+
+    # ── Area breakdown ──
+    areas: dict[str, dict[str, int]] = {}
+    for r in results:
+        area = SECTION_META.get(r["num"], {}).get("area", "Other")
+        a = areas.setdefault(area, {"clear": 0, "data": 0, "error": 0})
+        a[_status_class(r["badge"])] += 1
+
+    out.append('<div class="section-title">Breakdown by area</div>')
+    out.append('<table class="areas"><thead><tr><th>Area</th>'
+               '<th class="num">Clear</th><th class="num">Findings</th>'
+               '<th class="num">Unavailable</th></tr></thead><tbody>')
+    for area, c in areas.items():
+        out.append(f'<tr><td>{esc(area)}</td><td class="num">{c["clear"]}</td>'
+                   f'<td class="num">{c["data"]}</td><td class="num">{c["error"]}</td></tr>')
+    out.append('</tbody></table>')
+
+    # ── Toolbar ──
+    out.append('<div class="section-title">Sections</div>')
+    out.append('<div class="toolbar">')
+    out.append('<button class="btn" onclick="pgvSetAll(true)">Expand all</button>')
+    out.append('<button class="btn" onclick="pgvSetAll(false)">Collapse all</button>')
+    out.append('<button class="btn" onclick="window.print()">Print / Save PDF</button>')
+    out.append('</div>')
+
+    # ── Section cards ──
+    for r in results:
+        meta = SECTION_META.get(r["num"], {})
+        risk = meta.get("risk", "info")
+        rcolor = RISK_COLOR.get(risk, "#64748b")
+        sclass = _status_class(r["badge"])
+        is_open = " open" if r["badge"] in ("📊 Data", "⚠️ Error") else ""
+        out.append(f'<details class="section"{is_open}>')
+        out.append('<summary>')
+        out.append(f'<span class="dot {sclass}"></span>')
+        out.append(f'<span class="sec-num">{esc(r["num"])}</span>')
+        out.append(f'<span class="sec-name">{esc(r["title"])}</span>')
+        out.append(f'<span class="risk" style="background:{rcolor}">{esc(risk)}</span>')
+        out.append('</summary>')
+        out.append('<div class="sec-body">')
+
+        if r.get("header"):
+            out.append('<div class="hdr">')
+            for key in ("What", "Look for", "Action", "Requires"):
+                if key in r["header"]:
+                    out.append(f'<div><b>{key}</b> {esc(r["header"][key])}</div>')
+            out.append('</div>')
+
+        if r["badge"] == "⚠️ Error":
+            out.append(f'<div class="errbox">{esc(r["stderr"][:500])}</div>')
+            out.append(f'<div class="note">{esc(error_analysis(r["stderr"]))}</div>')
+        elif r["stdout"] and cfg.get("include_raw_output", True):
+            output = r["stdout"]
+            ol = output.split("\n")
+            if len(ol) > truncate:
+                output = "\n".join(ol[:truncate - 5])
+                output += f"\n... ({len(ol) - truncate + 5} more rows truncated)"
+            out.append(f'<pre>{esc(output)}</pre>')
+        else:
+            out.append('<div class="note">No output returned.</div>')
+
+        out.append('</div></details>')
+
+    # ── Recommendations ──
+    high = [r for r in results if r["badge"] == "📊 Data"
+            and SECTION_META.get(r["num"], {}).get("risk") in ("critical", "high")]
+    med = [r for r in results if r["badge"] == "📊 Data"
+           and SECTION_META.get(r["num"], {}).get("risk") == "medium"]
+    if high or med:
+        out.append('<div class="section-title">Recommendations</div>')
+        out.append('<ul class="recs">')
+        for r in high + med:
+            action = r.get("header", {}).get("Action", "Investigate findings")
+            out.append(f'<li><b>{esc(r["num"])} {esc(r["title"])}</b> — {esc(action)}</li>')
+        out.append('</ul>')
+
+    out.append('<footer>Generated by '
+               '<a href="https://github.com/pgvitals/pgvitals">pgvitals</a> · '
+               'read-only PostgreSQL diagnostics</footer>')
+    out.append(f'<script>{_HTML_JS}</script>')
+    out.append('</div></body></html>')
+    return "\n".join(out)
+
+
+# ════════════════════════════════════════════════════════════════════
 # CLI Entry Point
 # ════════════════════════════════════════════════════════════════════
 
@@ -527,6 +789,8 @@ Examples:
     # Report
     g3 = p.add_argument_group("Report")
     g3.add_argument("--output", "-o", help="Output file path (default: auto-generated)")
+    g3.add_argument("--format", choices=["markdown", "html"],
+                    help="Report format (default: markdown)")
     g3.add_argument("--no-raw", action="store_true", help="Omit raw query output from report")
 
     return p.parse_args()
@@ -548,6 +812,7 @@ def main() -> int:
     if args.sql_dir:    cfg["sql_dir"]    = args.sql_dir
     if args.timeout:    cfg["timeout_seconds"] = args.timeout
     if args.no_raw:     cfg["include_raw_output"] = False
+    if args.format:     cfg["format"]            = args.format
 
     # ── Resolve sections ────────────────────────────────────────────
     sql_dir = Path(cfg["sql_dir"])
@@ -661,7 +926,11 @@ def main() -> int:
     print()
 
     # ── Generate report ─────────────────────────────────────────────
-    report = generate_report(results, cfg, pg_version)
+    fmt = cfg.get("format", "markdown")
+    if fmt == "html":
+        report = generate_html_report(results, cfg, pg_version)
+    else:
+        report = generate_report(results, cfg, pg_version)
 
     # ── Determine output path ───────────────────────────────────────
     if args.output:
@@ -675,6 +944,9 @@ def main() -> int:
             timestamp=ts,
             host=cfg["host"].replace(".", "_"),
         )
+        # Match the extension to the chosen format
+        if fmt == "html" and filename.endswith(".md"):
+            filename = filename[:-3] + ".html"
         output_path = out_dir / filename
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

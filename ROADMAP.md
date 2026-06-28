@@ -53,11 +53,15 @@ Status legend: ⬜ not started · 🚧 in progress · ✅ done
 ## Phase 6 — Ecosystem Expansion
 *Largest surface area; needs a stable core. The MCP server can be pulled forward to Phase 3 to ride the AI wave harder.*
 
+- 🚧 **Monitoring integration / exporters** — feed pgvitals into the rest of the observability stack.
+  - ✅ **`--format json`** — stable machine-readable output (`schema_version` 1.0); the substrate every integration builds on.
+  - ✅ **`--format prometheus`** — text-exposition output for the node_exporter textfile collector / Pushgateway; `risk` is a label, so alerting is one PromQL expression.
+  - ⬜ *Follow-ups:* OpenTelemetry (OTLP) exporter · long-running `pgvitals serve` HTTP `/metrics` endpoint · `--output -` (stdout) for piping · direct `--pushgateway URL` push · example Grafana dashboard + alert rules.
 - ⬜ **MCP server** — expose diagnostics as Model Context Protocol tools so Claude / Cursor can run them conversationally.
 - ⬜ **TUI** — live-refreshing terminal health dashboard ("k9s for Postgres").
 - ⬜ **`.psqlrc` macro pack** — `\pgv slow`, `\pgv locks`, `\pgv health` shortcuts.
 - ⬜ **VS Code extension** — run a section from the editor, results inline.
-- ⬜ **Fleet mode** — run across many databases into one rollup dashboard.
+- ⬜ **Fleet mode** — run across many databases into one rollup dashboard (consumes `--format json`).
 
 ---
 

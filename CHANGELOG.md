@@ -8,6 +8,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- `--format json` — stable, machine-readable output (`schema_version` 1.0): score/grade,
+  per-area rollups, and one object per section (`num`, `area`, `risk`, `status`, `rows`,
+  header, raw). The foundation for dashboards, diffing, and automation
+- `--format prometheus` — Prometheus text-exposition output for the node_exporter textfile
+  collector / Pushgateway, turning a one-shot run into a scrapeable, alertable signal.
+  `risk` is a label, so paging on a critical finding is one PromQL expression
+  (`pgvitals_section_findings{risk="critical"} > 0`)
+- `run_diagnostics.py --selftest` — offline self-test exercising all four formatters
+  (markdown/html/json/prometheus) with no database; wired into CI
 - `37_extension_inventory.sql` — audit installed extensions, detect stale versions and public-schema placement
 - `38_foreign_data_wrappers.sql` — enumerate FDW servers, user mappings, and foreign tables
 - `39_function_performance.sql` — PL/pgSQL and stored procedure execution stats (requires `track_functions`)

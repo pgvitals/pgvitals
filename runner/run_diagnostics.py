@@ -25,6 +25,10 @@ Usage
     # Set output path
     python run_diagnostics.py --output ./my_report.md
 
+    # Machine-readable output
+    python run_diagnostics.py --format json --output ./report.json
+    python run_diagnostics.py --format prometheus --output ./pgvitals.prom
+
 Environment Variables
 ---------------------
     PGPASSWORD   - Password (overrides config file)
@@ -67,6 +71,19 @@ if sys.platform == "win32":
 SCRIPT_DIR  = Path(__file__).resolve().parent
 DEFAULT_CFG = SCRIPT_DIR / "pgvitals.conf"
 DEFAULT_SQL = SCRIPT_DIR.parent / "sql"
+
+# Stable schema version for machine-readable output (--format json).
+# Bump only on a breaking change to the JSON shape.
+JSON_SCHEMA_VERSION = "1.0"
+
+# Best-effort tool version (available when run as the installed package).
+try:
+    from pgvitals import __version__ as PGVITALS_VERSION
+except Exception:  # noqa: BLE001 — runner can be executed standalone
+    PGVITALS_VERSION = "dev"
+
+# File extension per output format.
+FORMAT_EXT = {"markdown": ".md", "html": ".html", "json": ".json", "prometheus": ".prom"}
 
 # Section metadata for smarter analysis
 SECTION_META: dict[str, dict[str, str]] = {
@@ -291,6 +308,19 @@ def count_rows(stdout: str) -> int | None:
     """Extract row count from psql output footer."""
     m = re.search(r"\((\d+) rows?\)", stdout)
     return int(m.group(1)) if m else None
+
+
+def section_status(badge: str) -> str:
+    """Map a display badge to a stable, machine-readable status token.
+
+    Used by the JSON and Prometheus outputs so consumers never have to parse
+    emoji. Mirrors classify_result's three outcomes.
+    """
+    if badge == "✅ Clear":
+        return "clear"
+    if badge == "📊 Data":
+        return "findings"
+    return "error"
 
 
 def error_analysis(stderr: str) -> str:
@@ -853,6 +883,180 @@ def generate_html_report(results: list[dict], cfg: dict, pg_version: str,
 
 
 # ════════════════════════════════════════════════════════════════════
+# JSON Output (machine-readable; the foundation other tools build on)
+# ════════════════════════════════════════════════════════════════════
+
+def build_result_model(results: list[dict], cfg: dict, pg_version: str,
+                       ai_analysis: str | None = None,
+                       include_raw: bool | None = None) -> dict:
+    """Assemble the canonical, serializable result model.
+
+    This is the single structured representation of a run. ``generate_json``
+    serializes it verbatim and ``generate_prometheus`` derives metrics from it,
+    so both formats stay in lock-step with the Markdown/HTML reports.
+    """
+    if include_raw is None:
+        include_raw = cfg.get("include_raw_output", True)
+
+    score = compute_score(results)
+    letter, label, _ = grade_for(score)
+
+    status_counts = {"clear": 0, "findings": 0, "error": 0}
+    areas: dict[str, dict[str, int]] = {}
+    sections: list[dict] = []
+
+    for r in results:
+        meta   = SECTION_META.get(r["num"], {})
+        area   = meta.get("area", "Other")
+        risk   = meta.get("risk", "info")
+        status = section_status(r["badge"])
+        status_counts[status] += 1
+
+        a = areas.setdefault(area, {"clear": 0, "findings": 0, "error": 0})
+        a[status] += 1
+
+        rows = None if status == "error" else (count_rows(r["stdout"]) or 0)
+
+        section: dict[str, Any] = {
+            "num": r["num"],
+            "file": r["file"],
+            "title": r["title"],
+            "area": area,
+            "risk": risk,
+            "status": status,
+            "rows": rows,
+            "header": r.get("header") or {},
+            "error": error_analysis(r["stderr"]) if status == "error" else None,
+        }
+        if include_raw:
+            section["raw"] = r["stdout"] if status != "error" else r["stderr"]
+        sections.append(section)
+
+    return {
+        "schema_version": JSON_SCHEMA_VERSION,
+        "tool": "pgvitals",
+        "tool_version": PGVITALS_VERSION,
+        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "database": {
+            "name": cfg.get("database"),
+            "host": cfg.get("host"),
+            "port": cfg.get("port"),
+            "user": cfg.get("user"),
+            "server_version": pg_version,
+        },
+        "score": {"value": score, "grade": letter, "label": label},
+        "summary": {
+            "sections": len(results),
+            "clear": status_counts["clear"],
+            "findings": status_counts["findings"],
+            "error": status_counts["error"],
+        },
+        "areas": areas,
+        "sections": sections,
+        "ai_analysis": ai_analysis,
+    }
+
+
+def generate_json(results: list[dict], cfg: dict, pg_version: str,
+                  ai_analysis: str | None = None) -> str:
+    """Serialize the run as pretty-printed JSON (UTF-8, stable key order)."""
+    model = build_result_model(results, cfg, pg_version, ai_analysis)
+    return json.dumps(model, indent=2, ensure_ascii=False)
+
+
+# ════════════════════════════════════════════════════════════════════
+# Prometheus Output (text exposition format; textfile-collector friendly)
+# ════════════════════════════════════════════════════════════════════
+
+def _prom_escape(value: str) -> str:
+    """Escape a Prometheus label value per the exposition format spec."""
+    return (
+        str(value)
+        .replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("\n", "\\n")
+    )
+
+
+def _prom_labels(pairs: dict[str, Any]) -> str:
+    """Render an ordered ``{k="v",...}`` label set, skipping None values."""
+    parts = [f'{k}="{_prom_escape(v)}"' for k, v in pairs.items() if v is not None]
+    return "{" + ",".join(parts) + "}"
+
+
+def generate_prometheus(results: list[dict], cfg: dict, pg_version: str,
+                        ai_analysis: str | None = None) -> str:
+    """Render the run as Prometheus text exposition format.
+
+    Designed for the node_exporter **textfile collector** (write to a
+    ``*.prom`` file) or a Pushgateway, turning a one-shot diagnostic run into a
+    scrapeable, alertable signal. ``risk`` is a label so you can alert on, e.g.,
+    ``pgvitals_section_findings{risk="critical"} > 0``.
+    """
+    model = build_result_model(results, cfg, pg_version, ai_analysis, include_raw=False)
+    db = model["database"]["name"]
+    out: list[str] = []
+
+    def metric(name: str, help_text: str, mtype: str, samples: list[tuple[str, Any]]) -> None:
+        out.append(f"# HELP {name} {help_text}")
+        out.append(f"# TYPE {name} {mtype}")
+        for labels, value in samples:
+            out.append(f"{name}{labels} {value}")
+
+    base = {"database": db}
+
+    metric("pgvitals_up",
+           "1 when a pgvitals run completed and produced this output.",
+           "gauge", [(_prom_labels(base), 1)])
+
+    metric("pgvitals_info",
+           "Static run metadata (value is always 1).", "gauge",
+           [(_prom_labels({
+               "database": db,
+               "host": model["database"]["host"],
+               "server_version": pg_version,
+               "tool_version": model["tool_version"],
+               "schema_version": model["schema_version"],
+           }), 1)])
+
+    metric("pgvitals_health_score",
+           "Overall pgvitals health score (0-100).", "gauge",
+           [(_prom_labels(base), model["score"]["value"])])
+
+    metric("pgvitals_health_grade",
+           "Health grade as an info metric (value is always 1).", "gauge",
+           [(_prom_labels({"database": db,
+                           "grade": model["score"]["grade"],
+                           "label": model["score"]["label"]}), 1)])
+
+    metric("pgvitals_sections",
+           "Section counts by execution status.", "gauge",
+           [(_prom_labels({**base, "status": s}), model["summary"][s])
+            for s in ("clear", "findings", "error")]
+           + [(_prom_labels({**base, "status": "total"}), model["summary"]["sections"])])
+
+    up_samples: list[tuple[str, Any]] = []
+    find_samples: list[tuple[str, Any]] = []
+    for s in model["sections"]:
+        seclabels = _prom_labels({
+            "database": db, "section": s["num"],
+            "area": s["area"], "risk": s["risk"], "title": s["title"],
+        })
+        up_samples.append((seclabels, 0 if s["status"] == "error" else 1))
+        if s["status"] != "error":
+            find_samples.append((seclabels, s["rows"]))
+
+    metric("pgvitals_section_up",
+           "1 if the section executed, 0 if it errored / was unavailable.",
+           "gauge", up_samples)
+    metric("pgvitals_section_findings",
+           "Number of finding rows a section returned (0 = clear).",
+           "gauge", find_samples)
+
+    return "\n".join(out) + "\n"
+
+
+# ════════════════════════════════════════════════════════════════════
 # CLI Entry Point
 # ════════════════════════════════════════════════════════════════════
 
@@ -868,6 +1072,8 @@ Examples:
   python run_diagnostics.py --host db.example.com     # Override host via CLI
   python run_diagnostics.py --sections 01,03,19,26    # Run specific sections
   python run_diagnostics.py --skip 05,36              # Skip specific sections
+  python run_diagnostics.py --format json -o out.json # Machine-readable output
+  python run_diagnostics.py --format prometheus       # Prometheus exposition (.prom)
         """,
     )
 
@@ -892,18 +1098,94 @@ Examples:
     # Report
     g3 = p.add_argument_group("Report")
     g3.add_argument("--output", "-o", help="Output file path (default: auto-generated)")
-    g3.add_argument("--format", choices=["markdown", "html"],
-                    help="Report format (default: markdown)")
+    g3.add_argument("--format", choices=["markdown", "html", "json", "prometheus"],
+                    help="Report format: markdown (default), html, json, or prometheus")
     g3.add_argument("--no-raw", action="store_true", help="Omit raw query output from report")
     g3.add_argument("--explain", action="store_true",
                     help="Add an AI analysis of the findings (requires ANTHROPIC_API_KEY)")
     g3.add_argument("--explain-model", help="Model for --explain (default: claude-sonnet-4-6)")
 
+    p.add_argument("--selftest", action="store_true",
+                   help="Run offline format self-tests (no database) and exit")
+
     return p.parse_args()
+
+
+def _selftest() -> int:
+    """Exercise every output formatter against synthetic results — no DB needed.
+
+    Validates that JSON parses and carries the expected shape, and that the
+    Prometheus output is well-formed exposition text. Wired into CI.
+    """
+    results = [
+        {"num": "01", "file": "01_slow_queries.sql", "title": "Slow Queries",
+         "header": {"What": "x", "Action": "tune"}, "stdout": "row\n(3 rows)",
+         "stderr": "", "rc": 0, "badge": "📊 Data"},
+        {"num": "07", "file": "07_duplicate_indexes.sql", "title": "Duplicate Indexes",
+         "header": {}, "stdout": "(0 rows)", "stderr": "", "rc": 0, "badge": "✅ Clear"},
+        {"num": "26", "file": "26_xid_wraparound.sql", "title": "Xid Wraparound",
+         "header": {"Action": "VACUUM"}, "stdout": "danger\n(1 row)",
+         "stderr": "", "rc": 0, "badge": "📊 Data"},
+        {"num": "36", "file": "36_pg_stat_io.sql", "title": "Pg Stat Io",
+         "header": {}, "stdout": "",
+         "stderr": "ERROR:  relation \"pg_stat_io\" does not exist",
+         "rc": 1, "badge": "⚠️ Error"},
+    ]
+    cfg = {"database": "selftest", "host": "localhost", "port": 5432,
+           "user": "postgres", "include_raw_output": True}
+    pg_version = "16.2"
+    failures: list[str] = []
+
+    # Markdown + HTML must not raise and must be non-empty.
+    for name, fn in (("markdown", generate_report), ("html", generate_html_report)):
+        text = fn(results, cfg, pg_version)
+        if not text or len(text) < 50:
+            failures.append(f"{name}: empty/too short")
+
+    # JSON: parses, correct counts, no raw leakage rules.
+    doc = json.loads(generate_json(results, cfg, pg_version))
+    if doc["schema_version"] != JSON_SCHEMA_VERSION:
+        failures.append("json: schema_version mismatch")
+    if doc["summary"] != {"sections": 4, "clear": 1, "findings": 2, "error": 1}:
+        failures.append(f"json: bad summary {doc['summary']}")
+    if doc["score"]["value"] != compute_score(results):
+        failures.append("json: score mismatch")
+    sec01 = next(s for s in doc["sections"] if s["num"] == "01")
+    if sec01["rows"] != 3 or sec01["status"] != "findings":
+        failures.append(f"json: section 01 wrong {sec01['rows']}/{sec01['status']}")
+    if next(s for s in doc["sections"] if s["num"] == "36")["rows"] is not None:
+        failures.append("json: error section should have null rows")
+
+    # Prometheus: parseable lines, expected metric names, label escaping intact.
+    prom = generate_prometheus(results, cfg, pg_version)
+    plines = [ln for ln in prom.splitlines() if ln and not ln.startswith("#")]
+    for ln in plines:
+        if " " not in ln or not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*(\{.*\})? -?\d", ln):
+            failures.append(f"prometheus: malformed line: {ln}")
+            break
+    needed = ["pgvitals_up", "pgvitals_health_score", "pgvitals_section_findings",
+              "pgvitals_section_up", "pgvitals_info", "pgvitals_sections"]
+    for m in needed:
+        if not any(ln.startswith(m) for ln in plines):
+            failures.append(f"prometheus: missing metric {m}")
+    if f'pgvitals_health_score{{database="selftest"}} {compute_score(results)}' not in prom:
+        failures.append("prometheus: health_score line missing/incorrect")
+
+    if failures:
+        print("SELFTEST FAILED:")
+        for f in failures:
+            print(f"  - {f}")
+        return 1
+    print(f"pgvitals format self-test passed "
+          f"(markdown, html, json, prometheus; score={compute_score(results)})")
+    return 0
 
 
 def main() -> int:
     args = parse_args()
+
+    if args.selftest:
+        return _selftest()
 
     # ── Load config ─────────────────────────────────────────────────
     cfg = load_config(args.config, args.profile)
@@ -1055,6 +1337,10 @@ def main() -> int:
     fmt = cfg.get("format", "markdown")
     if fmt == "html":
         report = generate_html_report(results, cfg, pg_version, ai_analysis)
+    elif fmt == "json":
+        report = generate_json(results, cfg, pg_version, ai_analysis)
+    elif fmt == "prometheus":
+        report = generate_prometheus(results, cfg, pg_version, ai_analysis)
     else:
         report = generate_report(results, cfg, pg_version, ai_analysis)
 
@@ -1071,8 +1357,9 @@ def main() -> int:
             host=cfg["host"].replace(".", "_"),
         )
         # Match the extension to the chosen format
-        if fmt == "html" and filename.endswith(".md"):
-            filename = filename[:-3] + ".html"
+        ext = FORMAT_EXT.get(fmt, ".md")
+        if not filename.endswith(ext):
+            filename = re.sub(r"\.[^.]+$", "", filename) + ext
         output_path = out_dir / filename
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

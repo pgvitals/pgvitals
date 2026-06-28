@@ -190,3 +190,6 @@ jobs:
 
       - name: Explain module self-test (offline)
         run: python runner/explain.py --selftest
+
+      - name: Output format self-test (offline)
+        run: python runner/run_diagnostics.py --selftest

@@ -33,7 +33,7 @@ Runner:
   --sections LIST     Run specific sections, e.g. --sections 01,06,19
   --skip    LIST      Skip specific sections, e.g. --skip 05,36
   --output  PATH      Report output path (default: auto-named in ./reports/)
-  --format  FMT       Report format: markdown (default) or html
+  --format  FMT       Report format: markdown (default), html, json, or prometheus
   --explain           Add an AI analysis of findings (needs ANTHROPIC_API_KEY)
   --sql-dir PATH      Override path to sql/ directory
   --psql    PATH      Path to psql binary if not on PATH

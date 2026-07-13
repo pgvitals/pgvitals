@@ -47,9 +47,9 @@
             "host": "hh-pgsql-public.ebi.ac.uk",
             "port": 5432,
             "user": "reader",
-            "password": "NWDMCE5xdipIjRrp",
+            "password": "",
             "database": "pfmegrnargs",
-            "_note": "Public read-only database (European Bioinformatics Institute)"
+            "_note": "Public read-only demo database (EBI RNAcentral). The public password is documented at https://rnacentral.org/help/public-database"
         }
     }
 }
